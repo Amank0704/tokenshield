@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-09-02T22:06:31.454433",
+  "runs": [
+    {
+      "dataset_id": "A8_cic_iot2023",
+      "name": "CIC IoT 2023",
+      "group": "A",
+      "mode": "kaggle",
+      "timestamp": "2026-09-02T21:58:50.995534",
+      "dest": "/Volumes/yash ssd/engine/ml/data/raw/A8_cic_iot2023",
+      "status": "ok",
+      "files": [
+        "/Volumes/yash ssd/engine/ml/data/raw/A8_cic_iot2023/balanced_7classes_500000_each.csv"
+      ],
+      "error": null
+    }
+  ]
+}

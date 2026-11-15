@@ -3,10 +3,66 @@ Main Routes - NeoVault + TokenShield
 Serves all HTML pages and static files
 """
 
-from flask import Blueprint, send_from_directory, redirect
+from flask import Blueprint, send_from_directory, redirect, request, jsonify
 import os
+import json
+from engine.state.user_profiles import UserProfileStore
 
 main_bp = Blueprint('main', __name__)
+
+
+# ============================================================================
+# BIOMETRICS TELEMETRY & WARM-UP (Phase 3)
+# ============================================================================
+
+@main_bp.route('/api/biometrics/update', methods=['POST'])
+def biometrics_update():
+    """
+    Accepts client-side behavioral telemetry (typing, mouse, idle patterns)
+    and updates the user baseline in UserProfileStore.
+    Non-blocking, does not run threat detection.
+    """
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    if not user_id:
+        # Check if auth bearer session is present
+        from app.utils import decode_token
+        auth = request.headers.get("Authorization", "")
+        token = auth[7:] if auth.startswith("Bearer ") else None
+        if token:
+            payload = decode_token(token)
+            if payload and "sub" in payload:
+                user_id = str(payload["sub"])
+
+    metrics = data.get("metrics") or data.get("features")
+    if not metrics and request.headers.get("X-TS-Biometrics"):
+        try:
+            metrics = json.loads(request.headers.get("X-TS-Biometrics"))
+        except Exception:
+            pass
+
+    if not user_id or not metrics:
+        return jsonify({"success": False, "error": "user_id and metrics required"}), 400
+
+    store = UserProfileStore()
+    profile = store.update_profile(str(user_id), metrics)
+    sample_count = profile.get("sample_count", 0)
+
+    # Sync to standalone engine
+    try:
+        from sdk.python.tokenshield_sdk import TokenShieldClient
+        ts_client = TokenShieldClient(engine_url="http://127.0.0.1:7777", timeout=0.1)
+        ts_client.report_biometrics(user_id=str(user_id), biometrics=metrics)
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "user_id": str(user_id),
+        "samples_collected": sample_count,
+        "warmup_complete": sample_count >= 5
+    }), 200
+
 
 
 # ============================================================================
@@ -84,7 +140,18 @@ def serve_assets(filename):
 
 @main_bp.route('/simulation')
 def simulation_dashboard():
-         return send_from_directory('../frontend', 'simulation_dashboard.html')
+    return send_from_directory('../frontend', 'simulation_dashboard.html')
+
+
+@main_bp.route('/war-room')
+@main_bp.route('/command-center')
+def war_room_dashboard():
+    return send_from_directory('../frontend', 'war_room.html')
+
+
+@main_bp.route('/attacker-studio')
+def attacker_studio():
+    return send_from_directory('../frontend', 'attacker_studio.html')
 # ============================================================================
 # UTILITY ROUTES
 # ============================================================================

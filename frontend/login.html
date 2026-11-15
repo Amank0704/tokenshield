@@ -62,7 +62,6 @@
     .fn{text-align:center;margin-top:16px;font-size:11.5px;color:var(--gray-400);line-height:1.6}
     .fn a{color:var(--blue);text-decoration:none}
     .secrow{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:12px;font-size:11px;color:var(--gray-400)}
-    /* 2FA Overlay */
     .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center}
     .ov.show{display:flex}
     .ovbox{background:#fff;border-radius:16px;padding:32px 28px;width:90%;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15)}
@@ -79,7 +78,6 @@
     .ovrel{position:relative}
     .totp-badge{display:inline-flex;align-items:center;gap:5px;background:var(--blue-light);color:var(--blue);border-radius:20px;padding:4px 10px;font-size:11.5px;font-weight:600;margin-bottom:14px}
     .hint{font-size:11px;color:var(--gray-400);margin-top:10px;line-height:1.5}
-    /* Security alert banner for locked accounts */
     .security-banner{background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.35);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:none}
     .security-banner.show{display:block}
     .sb-title{font-size:13px;font-weight:700;color:var(--red);margin-bottom:4px}
@@ -87,13 +85,21 @@
   </style>
 </head>
 <body>
+
 <nav class="nav">
-  <a class="brand" href="/"><div class="bmark">N</div><span class="bname">NeoVault</span></a>
-  <div class="navlinks"><a class="navlink" href="#">Help</a><a class="navlink" href="#">Security</a></div>
+  <a class="brand" href="/">
+    <div class="bmark">N</div>
+    <span class="bname">NeoVault</span>
+  </a>
+  <div class="navlinks">
+    <a class="navlink" href="#">Help</a>
+    <a class="navlink" href="#">Security</a>
+  </div>
 </nav>
 
 <div class="main">
   <div class="wrap">
+
     <div class="ph">
       <div class="plogo">🏦</div>
       <h1 class="ptitle">Welcome back</h1>
@@ -101,6 +107,7 @@
     </div>
 
     <div class="card">
+
       <div class="tabs">
         <button class="tab active" onclick="swTab('login',this)">Sign In</button>
         <button class="tab" onclick="swTab('register',this)">Create Account</button>
@@ -108,36 +115,66 @@
 
       <!-- LOGIN -->
       <div class="pane active" id="pane-login">
-        <div class="alert aerr" id="le"><span>⚠</span><span id="let"></span></div>
+
+        <div class="alert aerr" id="le">
+          <span>⚠</span>
+          <span id="let"></span>
+        </div>
 
         <button class="google-btn" id="gbtn" onclick="doGoogleSignIn()">
           <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
           Continue with Google
         </button>
 
-        <div class="divider"><span>or sign in with username</span></div>
+        <div class="divider">
+          <span>or sign in with username</span>
+        </div>
 
-        <div class="fg"><label class="fl">Username</label><input class="fi" id="lu" type="text" placeholder="Enter your username" autocomplete="username"></div>
+        <div class="fg">
+          <label class="fl">Username</label>
+          <input class="fi" id="lu" type="text"
+                 placeholder="Enter your username"
+                 autocomplete="username">
+        </div>
+
         <div class="fg">
           <label class="fl">Password</label>
           <div class="iw">
-            <input class="fi" id="lp" type="password" placeholder="Enter your password" style="padding-right:34px" autocomplete="current-password">
-            <button class="eyebtn" onclick="tp('lp',this)" tabindex="-1">👁</button>
+            <input class="fi" id="lp" type="password"
+                   placeholder="Enter your password"
+                   style="padding-right:34px"
+                   autocomplete="current-password">
+            <button class="eyebtn"
+                    onclick="tp('lp',this)"
+                    tabindex="-1">👁</button>
           </div>
         </div>
+
         <a class="forgot" href="#">Forgot password?</a>
-        <button class="sbtn" id="lbtn" onclick="doLogin()">Sign In</button>
+
+        <button class="sbtn" id="lbtn" onclick="doLogin()">
+          Sign In
+        </button>
+
       </div>
 
       <!-- REGISTER -->
       <div class="pane" id="pane-register">
-        <div class="alert aerr" id="re"><span>⚠</span><span id="ret"></span></div>
-        <div class="alert aok" id="rok"><span>✓</span><span>Account created! Signing you in…</span></div>
+
+        <div class="alert aerr" id="re">
+          <span>⚠</span>
+          <span id="ret"></span>
+        </div>
+
+        <div class="alert aok" id="rok">
+          <span>✓</span>
+          <span>Account created! Signing you in…</span>
+        </div>
 
         <button class="google-btn" onclick="doGoogleSignIn()">
           <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -149,127 +186,294 @@
           Sign up with Google
         </button>
 
-        <div class="divider"><span>or create with email</span></div>
+        <div class="divider">
+          <span>or create with email</span>
+        </div>
 
-        <div class="fg"><label class="fl">Username</label><input class="fi" id="ru" type="text" placeholder="Choose a username"></div>
-        <div class="fg"><label class="fl">Email Address</label><input class="fi" id="rem" type="email" placeholder="your@email.com"></div>
+        <div class="fg">
+          <label class="fl">Username</label>
+          <input class="fi" id="ru" type="text"
+                 placeholder="Choose a username">
+        </div>
+
+        <div class="fg">
+          <label class="fl">Email Address</label>
+          <input class="fi" id="rem" type="email"
+                 placeholder="your@email.com">
+        </div>
+
         <div class="fg">
           <label class="fl">Password</label>
           <div class="iw">
-            <input class="fi" id="rp" type="password" placeholder="At least 8 characters" style="padding-right:34px">
-            <button class="eyebtn" onclick="tp('rp',this)" tabindex="-1">👁</button>
+            <input class="fi" id="rp" type="password"
+                   placeholder="At least 8 characters"
+                   style="padding-right:34px">
+            <button class="eyebtn"
+                    onclick="tp('rp',this)"
+                    tabindex="-1">👁</button>
           </div>
         </div>
-        <button class="sbtn" id="rbtn" onclick="doRegister()">Create Account</button>
+
+        <button class="sbtn" id="rbtn" onclick="doRegister()">
+          Create Account
+        </button>
+
       </div>
+
     </div>
 
-    <div class="fn">By continuing you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a></div>
-    <div class="secrow">🔒 256-bit SSL · Protected by TokenShield™</div>
+    <div class="fn">
+      By continuing you agree to our
+      <a href="#">Terms</a> and
+      <a href="#">Privacy Policy</a>
+    </div>
+
+    <div class="secrow">
+      🔒 256-bit SSL · Protected by TokenShield™
+    </div>
+
   </div>
 </div>
 
 <!-- 2FA / TOTP Overlay -->
 <div class="ov" id="otpov">
   <div class="ovbox ovrel">
+
     <button class="ovclose" onclick="closeOTP()">✕</button>
+
     <div class="ovicon" id="otpicon">🔐</div>
-    <h2 class="ovtitle" id="otptitle">Verify Your Identity</h2>
-    <div class="totp-badge" id="totpbadge" style="display:none">📱 Google Authenticator</div>
-    <!-- Security incident banner inside 2FA overlay -->
+
+    <h2 class="ovtitle" id="otptitle">
+      Verify Your Identity
+    </h2>
+
+    <div class="totp-badge"
+         id="totpbadge"
+         style="display:none">
+      📱 Google Authenticator
+    </div>
+
     <div class="security-banner" id="sec-banner">
-      <div class="sb-title">🚨 Security Incident Detected</div>
-      <div class="sb-desc" id="sec-banner-desc">Your account was locked after suspicious activity. Enter any 6-digit code to restore access.</div>
+      <div class="sb-title">
+        🚨 Security Incident Detected
+      </div>
+      <div class="sb-desc" id="sec-banner-desc">
+        Your account was locked after suspicious activity.
+        Enter any 6-digit code to restore access.
+      </div>
     </div>
-    <p class="ovdesc" id="otpdesc">Enter the 6-digit code from your authenticator app.</p>
+
+    <p class="ovdesc" id="otpdesc">
+      Enter the 6-digit code from your authenticator app.
+    </p>
+
     <div class="otp-dots" id="otpdots">
-      <div class="otp-dot" id="d0"></div><div class="otp-dot" id="d1"></div>
-      <div class="otp-dot" id="d2"></div><div class="otp-dot" id="d3"></div>
-      <div class="otp-dot" id="d4"></div><div class="otp-dot" id="d5"></div>
+      <div class="otp-dot" id="d0"></div>
+      <div class="otp-dot" id="d1"></div>
+      <div class="otp-dot" id="d2"></div>
+      <div class="otp-dot" id="d3"></div>
+      <div class="otp-dot" id="d4"></div>
+      <div class="otp-dot" id="d5"></div>
     </div>
-    <input class="otpin" id="otpv" type="text" maxlength="6" placeholder="——————" inputmode="numeric" autocomplete="one-time-code">
-    <button class="sbtn" id="otpbtn" onclick="doOTP()">Verify &amp; Continue →</button>
-    <p class="hint" id="otphint">Open your authenticator app and enter the current 6-digit code.</p>
+
+    <input class="otpin"
+           id="otpv"
+           type="text"
+           maxlength="6"
+           placeholder="——————"
+           inputmode="numeric"
+           autocomplete="one-time-code">
+
+    <button class="sbtn" id="otpbtn" onclick="doOTP()">
+      Verify &amp; Continue →
+    </button>
+
+    <p class="hint" id="otphint">
+      Open your authenticator app and enter the current
+      6-digit code.
+    </p>
+
   </div>
 </div>
 
 <script>
 const API = '';
+
 let p2fa = null;
 let totpRequired = false;
 let isSecurityLockout = false;
 
 function swTab(n, el) {
-  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab')
+    .forEach(b => b.classList.remove('active'));
+
+  document.querySelectorAll('.pane')
+    .forEach(p => p.classList.remove('active'));
+
   el.classList.add('active');
-  document.getElementById('pane-' + n).classList.add('active');
+
+  document.getElementById('pane-' + n)
+    .classList.add('active');
 }
 
 function tp(id, btn) {
   const i = document.getElementById(id);
-  i.type = i.type === 'password' ? 'text' : 'password';
-  btn.textContent = i.type === 'password' ? '👁' : '🙈';
+
+  i.type =
+    i.type === 'password'
+      ? 'text'
+      : 'password';
+
+  btn.textContent =
+    i.type === 'password'
+      ? '👁'
+      : '🙈';
 }
 
 function showOTP(isTOTP, isLockout) {
+
   totpRequired = isTOTP;
   isSecurityLockout = !!isLockout;
 
-  // Show security banner if this is a lockout
-  const banner = document.getElementById('sec-banner');
+  const banner =
+    document.getElementById('sec-banner');
+
   if (isLockout) {
+
     banner.classList.add('show');
-    document.getElementById('sec-banner-desc').textContent =
+
+    document.getElementById(
+      'sec-banner-desc'
+    ).textContent =
       'Your account was locked after a security incident. Enter any 6-digit code to restore access.';
-    document.getElementById('otpicon').textContent = '🛡️';
-    document.getElementById('otptitle').textContent = 'Security Verification Required';
-    document.getElementById('otpdesc').textContent = 'TokenShield detected suspicious activity on your account. Enter any 6-digit code to verify your identity.';
-    document.getElementById('otphint').textContent = 'Demo mode: enter any 6 digits (e.g. 123456) to restore access.';
-    document.getElementById('totpbadge').style.display = 'none';
+
+    document.getElementById(
+      'otpicon'
+    ).textContent = '🛡️';
+
+    document.getElementById(
+      'otptitle'
+    ).textContent =
+      'Security Verification Required';
+
+    document.getElementById(
+      'otpdesc'
+    ).textContent =
+      'TokenShield detected suspicious activity on your account. Enter any 6-digit code to verify your identity.';
+
+    document.getElementById(
+      'otphint'
+    ).textContent =
+      'Demo mode: enter any 6 digits (e.g. 123456) to restore access.';
+
+    document.getElementById(
+      'totpbadge'
+    ).style.display = 'none';
+
   } else {
+
     banner.classList.remove('show');
-    document.getElementById('totpbadge').style.display = isTOTP ? 'inline-flex' : 'none';
-    document.getElementById('otpicon').textContent = isTOTP ? '📱' : '🔐';
-    document.getElementById('otptitle').textContent = isTOTP ? 'Authenticator Code' : 'Verify Your Identity';
-    document.getElementById('otpdesc').textContent = isTOTP
-      ? 'Open Google Authenticator (or Authy) and enter the 6-digit code shown for NeoVault.'
-      : 'Enter the 6-digit code sent to your registered device to continue.';
-    document.getElementById('otphint').textContent = isTOTP
-      ? 'The code refreshes every 30 seconds.'
-      : 'Demo mode: any 6-digit code works (e.g. 123456).';
+
+    document.getElementById(
+      'totpbadge'
+    ).style.display =
+      isTOTP
+        ? 'inline-flex'
+        : 'none';
+
+    document.getElementById(
+      'otpicon'
+    ).textContent =
+      isTOTP
+        ? '📱'
+        : '🔐';
+
+    document.getElementById(
+      'otptitle'
+    ).textContent =
+      isTOTP
+        ? 'Authenticator Code'
+        : 'Verify Your Identity';
+
+    document.getElementById(
+      'otpdesc'
+    ).textContent =
+      isTOTP
+        ? 'Open Google Authenticator (or Authy) and enter the 6-digit code shown for NeoVault.'
+        : 'Enter the 6-digit code sent to your registered device to continue.';
+
+    document.getElementById(
+      'otphint'
+    ).textContent =
+      isTOTP
+        ? 'The code refreshes every 30 seconds.'
+        : 'Demo mode: any 6-digit code works (e.g. 123456).';
   }
 
   document.getElementById('otpv').value = '';
+
   updateDots('');
-  document.getElementById('otpov').classList.add('show');
-  setTimeout(() => document.getElementById('otpv').focus(), 100);
+
+  document.getElementById(
+    'otpov'
+  ).classList.add('show');
+
+  setTimeout(
+    () => document.getElementById('otpv').focus(),
+    100
+  );
 }
 
 function closeOTP() {
-  document.getElementById('otpov').classList.remove('show');
+
+  document.getElementById(
+    'otpov'
+  ).classList.remove('show');
+
   p2fa = null;
   isSecurityLockout = false;
 }
 
 function updateDots(val) {
+
   for (let i = 0; i < 6; i++) {
-    document.getElementById('d' + i).classList.toggle('filled', i < val.length);
+
+    document.getElementById(
+      'd' + i
+    ).classList.toggle(
+      'filled',
+      i < val.length
+    );
   }
 }
 
-// ── FIXED: saveAndRedirect ──
-// Only redirect to /admin if user is explicitly an admin (is_admin=true)
-// Regular users (demo, alice, bob) always go to /dashboard
+// Strict admin redirect.
 function saveAndRedirect(data) {
-  const user = data.user;
-  localStorage.setItem('nv_token', data.token);
-  localStorage.setItem('nv_user', JSON.stringify(user));
-  localStorage.setItem('token', data.token);
-  localStorage.setItem('user', JSON.stringify(user));
 
-  // Strict admin check: must have is_admin=true
-  // Non-admin users (including demo) always go to banking dashboard
+  const user = data.user;
+
+  localStorage.removeItem('attacker_sim');
+
+  localStorage.setItem(
+    'nv_token',
+    data.token
+  );
+
+  localStorage.setItem(
+    'nv_user',
+    JSON.stringify(user)
+  );
+
+  localStorage.setItem(
+    'token',
+    data.token
+  );
+
+  localStorage.setItem(
+    'user',
+    JSON.stringify(user)
+  );
+
   if (user.is_admin === true) {
     window.location.href = '/admin';
   } else {
@@ -278,177 +482,606 @@ function saveAndRedirect(data) {
 }
 
 async function doLogin() {
-  const u = document.getElementById('lu').value.trim();
-  const p = document.getElementById('lp').value;
-  const ee = document.getElementById('le');
-  const et = document.getElementById('let');
-  const btn = document.getElementById('lbtn');
+
+  const u =
+    document.getElementById('lu')
+      .value
+      .trim();
+
+  const p =
+    document.getElementById('lp')
+      .value;
+
+  const ee =
+    document.getElementById('le');
+
+  const et =
+    document.getElementById('let');
+
+  const btn =
+    document.getElementById('lbtn');
+
   ee.classList.remove('show');
 
-  if (!u || !p) { et.textContent = 'Please enter username and password.'; ee.classList.add('show'); return; }
+  if (!u || !p) {
 
-  btn.disabled = true; btn.textContent = 'Signing in…';
+    et.textContent =
+      'Please enter username and password.';
+
+    ee.classList.add('show');
+
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
   try {
-    const r = await fetch(API + '/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p })
-    });
+
+    const r = await fetch(
+      API + '/api/auth/login',
+      {
+        method: 'POST',
+
+        /*
+         * TokenShield addition:
+         * send the stable browser/device fingerprint
+         * generated by behavioral_collector.js.
+         */
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          ...(window.__TokenShieldFingerprint
+            ? {
+                'X-Device-Fingerprint':
+                  window.__TokenShieldFingerprint
+              }
+            : {})
+        },
+
+        body: JSON.stringify({
+          username: u,
+          password: p
+        })
+      }
+    );
+
     const d = await r.json();
 
     if (d.success) {
+
       saveAndRedirect(d);
+
     } else if (d.requires_2fa) {
-      p2fa = { username: u, password: p };
-      // Pass isLockout=true if this is a security incident lockout
-      showOTP(!!d.totp_required, !!d.security_lockout);
-      btn.disabled = false; btn.textContent = 'Sign In';
+
+      p2fa = {
+        username: u,
+        password: p
+      };
+
+      showOTP(
+        !!d.totp_required,
+        !!d.security_lockout
+      );
+
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+
     } else {
-      et.textContent = d.message || 'Invalid username or password.';
+
+      let msg = d.message || 'Invalid username or password.';
+      if (d.account_locked || d.requires_admin_unlock || (d.message && d.message.includes('locked'))) {
+        msg += `<div style="margin-top:8px"><button onclick="quickUnlock('${u}')" style="padding:6px 12px;background:#1652F0;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">⚡ Administrative Unlock & Sign In</button></div>`;
+      }
+      et.innerHTML = msg;
+
       ee.classList.add('show');
-      btn.disabled = false; btn.textContent = 'Sign In';
+
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
     }
+
   } catch {
-    et.textContent = 'Connection error. Please try again.';
+
+    et.textContent =
+      'Connection error. Please try again.';
+
     ee.classList.add('show');
-    btn.disabled = false; btn.textContent = 'Sign In';
+
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
   }
 }
 
-async function doRegister() {
-  const u = document.getElementById('ru').value.trim();
-  const e = document.getElementById('rem').value.trim();
-  const p = document.getElementById('rp').value;
-  const ee = document.getElementById('re'), et = document.getElementById('ret');
-  const ok = document.getElementById('rok'), btn = document.getElementById('rbtn');
-  ee.classList.remove('show'); ok.classList.remove('show');
-
-  if (!u || !e || !p) { et.textContent = 'All fields are required.'; ee.classList.add('show'); return; }
-  if (p.length < 8) { et.textContent = 'Password must be at least 8 characters.'; ee.classList.add('show'); return; }
-
-  btn.disabled = true; btn.textContent = 'Creating account…';
+async function quickUnlock(username) {
   try {
-    const r = await fetch(API + '/api/auth/register', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, email: e, password: p })
+    const r = await fetch(API + '/api/auth/unlock-demo', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: username || 'alice'})
     });
     const d = await r.json();
     if (d.success) {
-      ok.classList.add('show');
-      const lr = await fetch(API + '/api/auth/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      const ld = await lr.json();
-      if (ld.success) { setTimeout(() => saveAndRedirect(ld), 700); }
-    } else {
-      et.textContent = d.message || 'Registration failed.';
-      ee.classList.add('show');
-      btn.disabled = false; btn.textContent = 'Create Account';
+      document.getElementById('let').innerHTML = '✅ Account unlocked! Signing in…';
+      document.getElementById('le').className = 'alert aok show';
+      setTimeout(doLogin, 500);
     }
-  } catch {
-    et.textContent = 'Connection error.';
+  } catch(e) {}
+}
+
+async function doRegister() {
+
+  const u =
+    document.getElementById('ru')
+      .value
+      .trim();
+
+  const e =
+    document.getElementById('rem')
+      .value
+      .trim();
+
+  const p =
+    document.getElementById('rp')
+      .value;
+
+  const ee =
+    document.getElementById('re');
+
+  const et =
+    document.getElementById('ret');
+
+  const ok =
+    document.getElementById('rok');
+
+  const btn =
+    document.getElementById('rbtn');
+
+  ee.classList.remove('show');
+  ok.classList.remove('show');
+
+  if (!u || !e || !p) {
+
+    et.textContent =
+      'All fields are required.';
+
     ee.classList.add('show');
-    btn.disabled = false; btn.textContent = 'Create Account';
+
+    return;
+  }
+
+  if (p.length < 8) {
+
+    et.textContent =
+      'Password must be at least 8 characters.';
+
+    ee.classList.add('show');
+
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+
+  try {
+
+    const r = await fetch(
+      API + '/api/auth/register',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+
+        body: JSON.stringify({
+          username: u,
+          email: e,
+          password: p
+        })
+      }
+    );
+
+    const d = await r.json();
+
+    if (d.success) {
+
+      ok.classList.add('show');
+
+      const lr = await fetch(
+        API + '/api/auth/login',
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type':
+              'application/json',
+
+            ...(window.__TokenShieldFingerprint
+              ? {
+                  'X-Device-Fingerprint':
+                    window.__TokenShieldFingerprint
+                }
+              : {})
+          },
+
+          body: JSON.stringify({
+            username: u,
+            password: p
+          })
+        }
+      );
+
+      const ld = await lr.json();
+
+      if (ld.success) {
+
+        setTimeout(
+          () => saveAndRedirect(ld),
+          700
+        );
+      }
+
+    } else {
+
+      et.textContent =
+        d.message ||
+        'Registration failed.';
+
+      ee.classList.add('show');
+
+      btn.disabled = false;
+      btn.textContent =
+        'Create Account';
+    }
+
+  } catch {
+
+    et.textContent =
+      'Connection error.';
+
+    ee.classList.add('show');
+
+    btn.disabled = false;
+    btn.textContent =
+      'Create Account';
   }
 }
 
 async function doOTP() {
-  const c = document.getElementById('otpv').value.trim();
-  const btn = document.getElementById('otpbtn');
-  if (c.length !== 6) { document.getElementById('otpv').focus(); return; }
 
-  btn.disabled = true; btn.textContent = 'Verifying…';
+  const c =
+    document.getElementById('otpv')
+      .value
+      .trim();
+
+  const btn =
+    document.getElementById('otpbtn');
+
+  if (c.length !== 6) {
+
+    document.getElementById(
+      'otpv'
+    ).focus();
+
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
   try {
-    const r = await fetch(API + '/api/auth/login-2fa', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...p2fa, two_factor_code: c })
-    });
+
+    const r = await fetch(
+      API + '/api/auth/login-2fa',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          ...(window.__TokenShieldFingerprint
+            ? {
+                'X-Device-Fingerprint':
+                  window.__TokenShieldFingerprint
+              }
+            : {})
+        },
+
+        body: JSON.stringify({
+          ...p2fa,
+          two_factor_code: c
+        })
+      }
+    );
+
     const d = await r.json();
+
     if (d.success) {
+
       saveAndRedirect(d);
+
     } else {
-      document.getElementById('otpv').value = '';
+
+      document.getElementById(
+        'otpv'
+      ).value = '';
+
       updateDots('');
-      document.getElementById('otpv').style.borderColor = 'var(--red)';
-      setTimeout(() => document.getElementById('otpv').style.borderColor = '', 1200);
-      btn.disabled = false; btn.textContent = 'Verify & Continue →';
-      document.getElementById('otpv').focus();
+
+      document.getElementById(
+        'otpv'
+      ).style.borderColor =
+        'var(--red)';
+
+      setTimeout(
+        () =>
+          document.getElementById(
+            'otpv'
+          ).style.borderColor = '',
+        1200
+      );
+
+      btn.disabled = false;
+      btn.textContent =
+        'Verify & Continue →';
+
+      document.getElementById(
+        'otpv'
+      ).focus();
     }
+
   } catch {
-    btn.disabled = false; btn.textContent = 'Verify & Continue →';
+
+    btn.disabled = false;
+    btn.textContent =
+      'Verify & Continue →';
   }
 }
 
 // Google Sign-In
 let _googleClientId = null;
+
 async function _loadGoogleClientId() {
-  if (_googleClientId) return _googleClientId;
+
+  if (_googleClientId)
+    return _googleClientId;
+
   try {
-    const r = await fetch(API + '/api/auth/google/client-id');
+
+    const r = await fetch(
+      API + '/api/auth/google/client-id'
+    );
+
     const d = await r.json();
-    _googleClientId = d.client_id || '';
-  } catch { _googleClientId = ''; }
+
+    _googleClientId =
+      d.client_id || '';
+
+  } catch {
+
+    _googleClientId = '';
+  }
+
   return _googleClientId;
 }
 
 async function doGoogleSignIn() {
-  const clientId = await _loadGoogleClientId();
-  if (!clientId) { showErr('Google Sign-In is not configured on this server yet.'); return; }
-  if (typeof google === 'undefined' || !google.accounts) {
-    showErr('Google Sign-In SDK failed to load. Check your internet connection.'); return;
+
+  const clientId =
+    await _loadGoogleClientId();
+
+  if (!clientId) {
+
+    showErr(
+      'Google Sign-In is not configured on this server yet.'
+    );
+
+    return;
   }
-  google.accounts.id.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false });
+
+  if (
+    typeof google === 'undefined' ||
+    !google.accounts
+  ) {
+
+    showErr(
+      'Google Sign-In SDK failed to load. Check your internet connection.'
+    );
+
+    return;
+  }
+
+  google.accounts.id.initialize({
+    client_id: clientId,
+    callback: handleGoogleCredential,
+    auto_select: false
+  });
+
   google.accounts.id.prompt((n) => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('gbtn'), { theme: 'outline', size: 'large', width: 360 });
+
+    if (
+      n.isNotDisplayed() ||
+      n.isSkippedMoment()
+    ) {
+
+      google.accounts.id.renderButton(
+        document.getElementById('gbtn'),
+        {
+          theme: 'outline',
+          size: 'large',
+          width: 360
+        }
+      );
     }
   });
 }
 
 function showErr(msg) {
-  const el = document.getElementById('le');
-  const et = document.getElementById('let');
-  if (et) et.textContent = msg;
-  if (el) el.classList.add('show');
+
+  const el =
+    document.getElementById('le');
+
+  const et =
+    document.getElementById('let');
+
+  if (et)
+    et.textContent = msg;
+
+  if (el)
+    el.classList.add('show');
 }
 
 async function handleGoogleCredential(response) {
-  const btn = document.getElementById('gbtn');
-  btn.disabled = true; btn.textContent = 'Signing in with Google…';
+
+  const btn =
+    document.getElementById('gbtn');
+
+  btn.disabled = true;
+  btn.textContent =
+    'Signing in with Google…';
+
   try {
-    const r = await fetch(API + '/api/auth/google/verify', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: response.credential })
-    });
+
+    const r = await fetch(
+      API + '/api/auth/google/verify',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          ...(window.__TokenShieldFingerprint
+            ? {
+                'X-Device-Fingerprint':
+                  window.__TokenShieldFingerprint
+              }
+            : {})
+        },
+
+        body: JSON.stringify({
+          credential:
+            response.credential
+        })
+      }
+    );
+
     const d = await r.json();
-    if (d.success) { saveAndRedirect(d); }
-    else {
-      document.getElementById('let').textContent = d.message || 'Google sign-in failed.';
-      document.getElementById('le').classList.add('show');
-      btn.disabled = false; btn.textContent = 'Continue with Google';
+
+    if (d.success) {
+
+      saveAndRedirect(d);
+
+    } else {
+
+      document.getElementById(
+        'let'
+      ).textContent =
+        d.message ||
+        'Google sign-in failed.';
+
+      document.getElementById(
+        'le'
+      ).classList.add('show');
+
+      btn.disabled = false;
+
+      btn.textContent =
+        'Continue with Google';
     }
+
   } catch {
-    document.getElementById('let').textContent = 'Google sign-in error. Please try again.';
-    document.getElementById('le').classList.add('show');
-    btn.disabled = false; btn.textContent = 'Continue with Google';
+
+    document.getElementById(
+      'let'
+    ).textContent =
+      'Google sign-in error. Please try again.';
+
+    document.getElementById(
+      'le'
+    ).classList.add('show');
+
+    btn.disabled = false;
+
+    btn.textContent =
+      'Continue with Google';
   }
 }
 
-document.getElementById('otpv').addEventListener('input', function() {
-  this.value = this.value.replace(/\D/g, '').slice(0, 6);
-  updateDots(this.value);
-  if (this.value.length === 6) setTimeout(doOTP, 280);
-});
+document.getElementById(
+  'otpv'
+).addEventListener(
+  'input',
+  function() {
 
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
-  if (document.getElementById('otpov').classList.contains('show')) { doOTP(); return; }
-  const active = document.querySelector('.pane.active').id;
-  if (active === 'pane-login') doLogin(); else doRegister();
-});
+    this.value =
+      this.value
+        .replace(/\D/g, '')
+        .slice(0, 6);
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOTP(); });
+    updateDots(this.value);
+
+    if (this.value.length === 6) {
+
+      setTimeout(
+        doOTP,
+        280
+      );
+    }
+  }
+);
+
+document.addEventListener(
+  'keydown',
+  e => {
+
+    if (e.key !== 'Enter')
+      return;
+
+    if (
+      document.getElementById(
+        'otpov'
+      ).classList.contains('show')
+    ) {
+
+      doOTP();
+      return;
+    }
+
+    const active =
+      document.querySelector(
+        '.pane.active'
+      ).id;
+
+    if (
+      active === 'pane-login'
+    ) {
+
+      doLogin();
+
+    } else {
+
+      doRegister();
+    }
+  }
+);
+
+document.addEventListener(
+  'keydown',
+  e => {
+
+    if (e.key === 'Escape')
+      closeOTP();
+  }
+);
 </script>
+
+<!-- TokenShield behavioral telemetry -->
+<script src="/js/behavioral_collector.js"></script>
+
 </body>
 </html>

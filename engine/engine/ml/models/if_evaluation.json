@@ -1,0 +1,31 @@
+{
+  "model": "IsolationForest",
+  "validation": {
+    "split": "validation",
+    "roc_auc": 0.6157173480683167,
+    "avg_precision": 0.7518616505627655,
+    "f1": 0.6845680565403353,
+    "precision": 0.5204131311726249,
+    "recall": 1.0,
+    "fpr": 0.9999999999999855,
+    "threshold": 0.2,
+    "tp": 74825,
+    "tn": 0,
+    "fp": 68955,
+    "fn": 0
+  },
+  "test": {
+    "split": "test",
+    "roc_auc": 0.6165235090401299,
+    "avg_precision": 0.753480796146649,
+    "f1": 0.68560510835135,
+    "precision": 0.5216127304720374,
+    "recall": 1.0,
+    "fpr": 0.9999999999999855,
+    "threshold": 0.2,
+    "tp": 74998,
+    "tn": 0,
+    "fp": 68783,
+    "fn": 0
+  }
+}

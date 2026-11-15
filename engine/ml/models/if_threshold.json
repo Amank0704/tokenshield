@@ -1,0 +1,20 @@
+{
+  "threshold_raw": 0.4334384076067043,
+  "target_fpr": 0.05,
+  "n_features_in": 40,
+  "n_features_selected": 9,
+  "selected_features": [
+    "f04",
+    "f05",
+    "f06",
+    "f07",
+    "f15",
+    "f19",
+    "f32",
+    "f34",
+    "f37"
+  ],
+  "n_estimators": 300,
+  "train_normal_rows": 320449,
+  "trained_at": "2026-09-02 23:42:34.632457"
+}

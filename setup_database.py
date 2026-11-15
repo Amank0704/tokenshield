@@ -52,6 +52,17 @@ def setup_database():
 def create_demo_data():
     """Create demo users and banking data"""
     
+    # 0. Create Alice (Primary Demo User)
+    print("👤 Creating Alice (primary demo user)...")
+    alice = User(
+        username='alice',
+        email='alice@neovault.com',
+        is_admin=False,
+        is_active=True
+    )
+    alice.set_password('SecurePass123!')
+    db.session.add(alice)
+
     # 1. Create Admin User
     print("👤 Creating admin user...")
     admin = User(
@@ -91,12 +102,33 @@ def create_demo_data():
     db.session.commit()
     print("✅ Users created")
     
-    # 4. Create Bank Accounts for Demo User
-    print("🏦 Creating bank accounts...")
-    
+    # 4. Create Bank Accounts for Alice (Primary Demo)
+    print("🏦 Creating bank accounts for Alice...")
+    alice_checking = BankAccount(
+        user_id=alice.id,
+        account_number='NV12345678',
+        account_type='checking',
+        balance=Decimal('250000.00'),
+        currency='INR',
+        status='active'
+    )
+    db.session.add(alice_checking)
+
+    alice_savings = BankAccount(
+        user_id=alice.id,
+        account_number='NV87654321',
+        account_type='savings',
+        balance=Decimal('185000.00'),
+        currency='INR',
+        status='active'
+    )
+    db.session.add(alice_savings)
+
+    # 5. Create Bank Accounts for Demo User
+    print("🏦 Creating bank accounts for Demo...")
     checking = BankAccount(
         user_id=demo.id,
-        account_number='NV12345678',
+        account_number='NV22334455',
         account_type='checking',
         balance=Decimal('5420.50'),
         currency='USD',

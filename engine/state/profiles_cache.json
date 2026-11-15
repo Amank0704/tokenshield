@@ -1,0 +1,182 @@
+{
+  "alice@neovault.com": {
+    "user_id": "alice@neovault.com",
+    "sample_count": 26,
+    "metrics": {
+      "typing_wpm": {
+        "count": 25,
+        "mean": 54.2,
+        "M2": 612.5,
+        "variance": 25.5
+      },
+      "typing_rhythm_cv": {
+        "count": 25,
+        "mean": 0.33,
+        "M2": 0.0384,
+        "variance": 0.0016
+      },
+      "mouse_velocity_mean": {
+        "count": 25,
+        "mean": 425.0,
+        "M2": 48000.0,
+        "variance": 2000.0
+      },
+      "mouse_velocity_cv": {
+        "count": 25,
+        "mean": 0.42,
+        "M2": 0.06,
+        "variance": 0.0025
+      },
+      "idle_time_ratio": {
+        "count": 25,
+        "mean": 0.22,
+        "M2": 0.0216,
+        "variance": 0.0009
+      }
+    }
+  },
+  "demo": {
+    "user_id": "demo",
+    "sample_count": 25,
+    "metrics": {
+      "typing_wpm": {
+        "count": 25,
+        "mean": 52.0,
+        "M2": 580.0,
+        "variance": 24.1
+      },
+      "typing_rhythm_cv": {
+        "count": 25,
+        "mean": 0.32,
+        "M2": 0.036,
+        "variance": 0.0015
+      },
+      "mouse_velocity_mean": {
+        "count": 25,
+        "mean": 410.0,
+        "M2": 45000.0,
+        "variance": 1875.0
+      },
+      "mouse_velocity_cv": {
+        "count": 25,
+        "mean": 0.4,
+        "M2": 0.055,
+        "variance": 0.0023
+      },
+      "idle_time_ratio": {
+        "count": 25,
+        "mean": 0.21,
+        "M2": 0.02,
+        "variance": 0.0008
+      }
+    }
+  },
+  "10": {
+    "user_id": "10",
+    "sample_count": 1,
+    "metrics": {
+      "typing_wpm": {
+        "count": 1,
+        "mean": 285.0,
+        "M2": 0.0,
+        "variance": 1.0
+      },
+      "typing_rhythm_cv": {
+        "count": 0,
+        "mean": 0.0,
+        "M2": 0.0,
+        "variance": 1.0
+      },
+      "mouse_velocity_mean": {
+        "count": 1,
+        "mean": 0.0,
+        "M2": 0.0,
+        "variance": 1.0
+      },
+      "mouse_velocity_cv": {
+        "count": 0,
+        "mean": 0.0,
+        "M2": 0.0,
+        "variance": 1.0
+      },
+      "idle_time_ratio": {
+        "count": 0,
+        "mean": 0.0,
+        "M2": 0.0,
+        "variance": 1.0
+      }
+    }
+  },
+  "3": {
+    "user_id": "3",
+    "sample_count": 4564,
+    "metrics": {
+      "typing_wpm": {
+        "count": 4564,
+        "mean": 0.2786744084136718,
+        "M2": 8027.185680170911,
+        "variance": 1.7591903747909075
+      },
+      "typing_rhythm_cv": {
+        "count": 4564,
+        "mean": 0.0005074496056091167,
+        "M2": 0.026616746713409366,
+        "variance": 0.0001
+      },
+      "mouse_velocity_mean": {
+        "count": 4564,
+        "mean": 1989.589658194562,
+        "M2": 3229993873.7318654,
+        "variance": 707866.2883479871
+      },
+      "mouse_velocity_cv": {
+        "count": 4564,
+        "mean": 1.1288637160385664,
+        "M2": 637.5347352313735,
+        "variance": 0.13971832900095846
+      },
+      "idle_time_ratio": {
+        "count": 4564,
+        "mean": 0.41399978089395323,
+        "M2": 485.48387299977986,
+        "variance": 0.10639576440933154
+      }
+    }
+  },
+  "user_1001": {
+    "user_id": "user_1001",
+    "sample_count": 40,
+    "metrics": {
+      "typing_wpm": {
+        "count": 40,
+        "mean": 63.89999999999999,
+        "M2": 72183.6,
+        "variance": 1850.8615384615387
+      },
+      "typing_rhythm_cv": {
+        "count": 40,
+        "mean": 0.32949999999999996,
+        "M2": 2.717789999999999,
+        "variance": 0.06968692307692305
+      },
+      "mouse_velocity_mean": {
+        "count": 40,
+        "mean": 810.0,
+        "M2": 30840000.000000004,
+        "variance": 790769.2307692309
+      },
+      "mouse_velocity_cv": {
+        "count": 30,
+        "mean": 0.35,
+        "M2": 0.0,
+        "variance": 0.0001
+      },
+      "idle_time_ratio": {
+        "count": 40,
+        "mean": 0.12899999999999998,
+        "M2": 0.09996000000000001,
+        "variance": 0.002563076923076923
+      }
+    }
+  }
+}

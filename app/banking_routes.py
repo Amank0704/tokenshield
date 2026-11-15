@@ -217,19 +217,45 @@ def transfer_money(current_user, current_session):
     🛡️ CRITICAL: This is protected by TokenShield - suspicious sessions will be blocked
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
         from_account_number = data.get('from_account')
         to_account_number = data.get('to_account')
-        amount = Decimal(str(data.get('amount')))
+        amount = Decimal(str(data.get('amount') or 0))
         description = data.get('description', 'Money Transfer')
         
+        # Auto-detect source checking account if not explicitly specified
+        from_account = None
+        if from_account_number:
+            from_account = BankAccount.query.filter_by(
+                account_number=from_account_number,
+                user_id=current_user.id,
+                status='active'
+            ).first()
+        else:
+            from_account = (BankAccount.query.filter_by(
+                user_id=current_user.id,
+                account_type='checking',
+                status='active'
+            ).first() or BankAccount.query.filter_by(
+                user_id=current_user.id,
+                status='active'
+            ).first())
+            if from_account:
+                from_account_number = from_account.account_number
+
         # Validation
-        if not from_account_number or not to_account_number or amount <= 0:
+        if not to_account_number or amount <= 0:
             return jsonify({
                 'success': False,
-                'message': 'Invalid transfer details'
+                'message': 'Invalid transfer details: positive amount and recipient required'
             }), 400
+
+        if not from_account:
+            return jsonify({
+                'success': False,
+                'message': 'Source account not found or inactive'
+            }), 404
         
         # 🛡️ SECURITY CHECK: Check session anomaly score
         # Default threshold is 0.50 (50%)
@@ -275,18 +301,7 @@ def transfer_money(current_user, current_session):
             account_number=to_account_number,
             status='active'
         ).first()
-        
-        if not from_account:
-            return jsonify({
-                'success': False,
-                'message': 'Source account not found or inactive'
-            }), 404
-        
-        if not to_account:
-            return jsonify({
-                'success': False,
-                'message': 'Destination account not found or inactive'
-            }), 404
+        to_account_id = to_account.id if to_account else None
         
         # Check sufficient balance
         if from_account.balance < amount:
@@ -301,10 +316,10 @@ def transfer_money(current_user, current_session):
         # Create transaction
         transaction = Transaction(
             from_account_id=from_account.id,
-            to_account_id=to_account.id,
+            to_account_id=to_account_id,
             transaction_type='transfer',
             amount=amount,
-            currency='USD',
+            currency='INR',
             description=description,
             reference_number=reference,
             status='completed',
@@ -316,8 +331,9 @@ def transfer_money(current_user, current_session):
         from_account.balance -= amount
         from_account.last_transaction = datetime.utcnow()
         
-        to_account.balance += amount
-        to_account.last_transaction = datetime.utcnow()
+        if to_account:
+            to_account.balance += amount
+            to_account.last_transaction = datetime.utcnow()
         
         db.session.add(transaction)
         
@@ -782,32 +798,40 @@ def attack_status():
         "attacker_ip": "185.220.101.42"   (only when under_attack)
     }
     """
-    try:
-        from simulation.network_controller import resource_monitor
-        snapshot = resource_monitor.current()
-        phase = snapshot.get("phase", "normal")
-    except Exception:
-        phase = "normal"
-
-    # Get latest incident for attacker details
     attacker_ip  = None
     attack_type  = None
     threat_score = None
+    phase        = "normal"
 
-    if phase == "under_attack":
-        try:
-            from datetime import timedelta
-            cutoff = datetime.utcnow() - timedelta(minutes=5)
-            inc = (IncidentLog.query
-                   .filter(IncidentLog.timestamp >= cutoff)
-                   .order_by(IncidentLog.timestamp.desc())
-                   .first())
-            if inc:
-                attacker_ip  = inc.ip_address
-                attack_type  = inc.incident_type
-                threat_score = round(inc.anomaly_score * 100)
-        except Exception:
-            pass
+    try:
+        from simulation.network_controller import resource_monitor
+        from datetime import timedelta
+        # Check if an attack incident occurred within the last 15 seconds
+        cutoff = datetime.utcnow() - timedelta(seconds=15)
+        inc = (IncidentLog.query
+               .filter(IncidentLog.timestamp >= cutoff)
+               .order_by(IncidentLog.timestamp.desc())
+               .first())
+        if inc and (inc.anomaly_score or 0.0) >= 0.65:
+            phase = "under_attack"
+            attacker_ip  = inc.ip_address
+            attack_type  = inc.incident_type
+            threat_score = round((inc.anomaly_score or 0.85) * 100)
+            try:
+                resource_monitor.set_phase("under_attack")
+            except Exception:
+                pass
+        else:
+            # Revert to normal state when no active attack is underway
+            phase = "normal"
+            try:
+                snapshot = resource_monitor.current()
+                if snapshot.get("phase") != "normal":
+                    resource_monitor.set_phase("normal")
+            except Exception:
+                pass
+    except Exception:
+        phase = "normal"
 
     messages = {
         "normal":          "All systems secure. TokenShield is monitoring your session.",
@@ -888,6 +912,96 @@ def demo_account():
             "owner":          "Alice",
         }
     }), 200
+
+
+# ============================================================================
+# SEARCH ENDPOINT  (Primary SQL injection attack surface for TokenShield demo)
+# ============================================================================
+
+@banking_bp.route('/search', methods=['POST', 'GET'])
+@token_required
+def search_transactions(current_user, current_session):
+    """
+    Transaction / account search endpoint.
+
+    This endpoint is the primary SQL injection attack surface used by:
+      - OWASP ZAP scanner (automated SQLi fuzzing)
+      - Apache JMeter test plan (TG3 — SQL Injection Fuzzer)
+      - Attacker Studio GUI (SQLi Fuzzer tab)
+      - Locust SQLiBot class
+
+    The endpoint itself uses safe ORM — no real SQL injection risk.
+    The TokenShield middleware intercepts and inspects the raw `query` payload,
+    scoring it with Signal 4 (Payload Analysis). Malicious queries trigger
+    block decisions which are visible on the War Room dashboard in real time.
+
+    Request body: {"query": "<search string or inject payload>"}
+    """
+    try:
+        if request.method == 'POST':
+            body = request.get_json(force=True, silent=True) or {}
+            query_str = str(body.get('query', '') or body.get('q', ''))
+        else:
+            query_str = str(request.args.get('q', '') or request.args.get('query', ''))
+
+        # Log the search behavior for Signal 8 (sequential behavior tracking)
+        log_banking_behavior(
+            current_session.id,
+            'transaction_search',
+            '/api/banking/search'
+        )
+
+        # Safe ORM query — TokenShield has already inspected and scored
+        # the raw payload. This code only runs if the request was NOT blocked.
+        from sqlalchemy import or_
+        account_ids = [
+            a.id for a in BankAccount.query.filter_by(user_id=current_user.id).all()
+        ]
+
+        # Safe LIKE match (parameterised — immune to SQL injection)
+        safe_term = f"%{query_str[:100]}%"  # limit to 100 chars
+        results = (
+            Transaction.query
+            .filter(
+                Transaction.account_id.in_(account_ids),
+                or_(
+                    Transaction.description.ilike(safe_term),
+                    Transaction.reference_number.ilike(safe_term),
+                )
+            )
+            .order_by(Transaction.created_at.desc())
+            .limit(20)
+            .all()
+        ) if query_str else []
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'query': query_str,
+            'count': len(results),
+            'results': [t.to_dict() for t in results],
+            'security_note': 'All search queries are inspected by TokenShield AI in real time.',
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Search error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Search failed',
+        }), 500
+
+
+@banking_bp.route('/search', methods=['OPTIONS'])
+def search_options():
+    """CORS pre-flight for cross-origin attack tools."""
+    from flask import make_response
+    resp = make_response('', 204)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return resp
 
 
 # ============================================================================

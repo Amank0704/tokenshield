@@ -1,0 +1,36 @@
+{
+  "model_type": "HistGradientBoosting",
+  "calibrator": "CalibratedClassifierCV(sigmoid)",
+  "features": 40,
+  "training_time_sec": 85.09,
+  "validation": {
+    "split": "validation",
+    "roc_auc": 0.8949383947941469,
+    "avg_precision": 0.8685208607660474,
+    "f1": 0.8297216807760242,
+    "precision": 0.7249146007710902,
+    "recall": 0.9699565653190778,
+    "fpr": 0.39940540932491625,
+    "threshold": 0.5,
+    "tp": 72577,
+    "tn": 41414,
+    "fp": 27541,
+    "fn": 2248
+  },
+  "test": {
+    "split": "test",
+    "roc_auc": 0.8943491392802863,
+    "avg_precision": 0.8683333404031696,
+    "f1": 0.8295709450396407,
+    "precision": 0.7252422630512669,
+    "recall": 0.9689591722445932,
+    "fpr": 0.40025878487416366,
+    "threshold": 0.6,
+    "tp": 72670,
+    "tn": 41252,
+    "fp": 27531,
+    "fn": 2328,
+    "optimal_threshold": 0.6
+  },
+  "trained_at": "2026-09-02 23:50:53.416788"
+}

@@ -1,0 +1,38 @@
+\author{
+  \begin{tabular}[t]{c}
+    \IEEEauthorblockN{1\textsuperscript{st} Arvind R. Bhagat Patil} \
+    \IEEEauthorblockA{\textit{Dept. of Computer Technology} \
+    \textit{Yeshwantrao Chavan College of Engineering}\
+    Nagpur, India \
+    arbhagatpatil@gmail.com}
+  \end{tabular}\hspace{2.2cm}%
+  \begin{tabular}[t]{c}
+    \IEEEauthorblockN{2\textsuperscript{nd} Aman Kshirsagar} \
+    \IEEEauthorblockA{\textit{Dept. of Artificial Intelligence and Data Science} \
+    \textit{Yeshwantrao Chavan College of Engineering}\
+    Nagpur, India \
+    amankshirsagar@gmail.com}
+  \end{tabular}
+  \[0.6cm]
+  \begin{tabular}[t]{c}
+    \IEEEauthorblockN{3\textsuperscript{rd} Vedant Dhamele} \
+    \IEEEauthorblockA{\textit{Dept. of Artificial Intelligence and Data Science} \
+    \textit{Yeshwantrao Chavan College of Engineering}\
+    Nagpur, India \
+    vedantdhamele@gmail.com}
+  \end{tabular}\hspace{0.8cm}%
+  \begin{tabular}[t]{c}
+    \IEEEauthorblockN{4\textsuperscript{th} Yash Shashank Pachhade} \
+    \IEEEauthorblockA{\textit{Dept. of Artificial Intelligence and Data Science} \
+    \textit{Yeshwantrao Chavan College of Engineering}\
+    Nagpur, India \
+    yashp2906@gmail.com}
+  \end{tabular}\hspace{0.8cm}%
+  \begin{tabular}[t]{c}
+    \IEEEauthorblockN{5\textsuperscript{th} Yash Nandanwar} \
+    \IEEEauthorblockA{\textit{Dept. of Artificial Intelligence and Data Science} \
+    \textit{Yeshwantrao Chavan College of Engineering}\
+    Nagpur, India \
+    yashnandanwar2005@gmail.com}
+  \end{tabular}
+}

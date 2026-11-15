@@ -447,6 +447,61 @@ canvas { max-height: 130px; }
   .stat-strip { grid-template-columns: repeat(3,1fr); }
   .charts-row { grid-template-columns: 1fr; }
 }
+
+/* ── PRINT / PDF ─────────────────────────────────────────────────────────────
+   Hides all dashboard chrome; makes the forensic modal static so it prints
+   ──────────────────────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the forensic report modal */
+  body > *:not(#modal-forensic) { display: none !important; }
+  .topnav, .phase-banner, .stat-strip, .layout, .toast-container { display: none !important; }
+
+  /* Pull the modal out of fixed positioning so it flows on paper */
+  #modal-forensic {
+    position: static !important;
+    background: #fff !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    backdrop-filter: none !important;
+  }
+  /* Inner content card */
+  #modal-forensic > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  /* Force all text to print-safe colors */
+  #modal-forensic * {
+    color: #111 !important;
+    background: #fff !important;
+    border-color: #ccc !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  /* Keep accent highlights readable on paper */
+  #modal-forensic [style*="color:#00FF88"],
+  #modal-forensic [style*="color: #00FF88"] { color: #006633 !important; }
+  #modal-forensic [style*="color:#FF3B5C"],
+  #modal-forensic [style*="color: #FF3B5C"] { color: #cc0033 !important; }
+  #modal-forensic [style*="color:#00D4FF"],
+  #modal-forensic [style*="color: #00D4FF"] { color: #006699 !important; }
+  #modal-forensic [style*="color:#FFB800"],
+  #modal-forensic [style*="color: #FFB800"] { color: #cc8800 !important; }
+  #modal-forensic code { background: #f0f0f0 !important; color: #333 !important; }
+  /* Hide the close button row */
+  #modal-forensic button { display: none !important; }
+  /* Print URL */
+  @page { margin: 15mm; }
+}
 </style>
 </head>
 <body>
@@ -458,12 +513,13 @@ canvas { max-height: 130px; }
     TokenShield · Network Simulation
   </div>
   <div class="nav-status">
-    <div class="ns-item">GNS3 <span class="ns-val" id="ns-gns3">—</span></div>
+    <div class="ns-item" style="color:var(--cyan);font-weight:600"> Apple MacBook (8 Cores · 8.0 GB Unified Memory)</div>
     <div class="ns-item">Monitor <span class="ns-val green" id="ns-monitor">LIVE</span></div>
     <div class="ns-item">Refresh <span class="ns-val" id="ns-tick">0</span>s</div>
     <div class="ns-item">Phase <span class="ns-val" id="ns-phase">—</span></div>
   </div>
   <div class="nav-actions">
+    <button class="nav-btn" style="background:rgba(255,184,0,.15); border-color:#FFB800; color:#FFB800; font-weight:700;" onclick="openForensicReportModal()">📄 Forensic Report</button>
     <button class="nav-btn btn-ghost"    onclick="goAdmin()">Admin</button>
     <button class="nav-btn btn-ghost"    onclick="goSecurity()">Security</button>
     <button class="nav-btn btn-attack"   id="btn-attack"   onclick="triggerAttack()">⚡ Run Attack</button>
@@ -477,8 +533,8 @@ canvas { max-height: 130px; }
 
 <!-- ── STAT STRIP ── -->
 <div class="stat-strip">
-  <div class="stat-cell"><div class="sc-val green" id="st-cpu">—</div><div class="sc-lbl">CPU %</div></div>
-  <div class="stat-cell"><div class="sc-val cyan"  id="st-ram">—</div><div class="sc-lbl">RAM %</div></div>
+  <div class="stat-cell"><div class="sc-val green" id="st-cpu">—</div><div class="sc-lbl" id="st-cpu-sub">MacBook CPU %</div></div>
+  <div class="stat-cell"><div class="sc-val cyan"  id="st-ram">—</div><div class="sc-lbl" id="st-ram-sub">MacBook RAM (8.0 GB)</div></div>
   <div class="stat-cell"><div class="sc-val white" id="st-net">—</div><div class="sc-lbl">Net KB/s</div></div>
   <div class="stat-cell"><div class="sc-val white" id="st-conn">—</div><div class="sc-lbl">Connections</div></div>
   <div class="stat-cell"><div class="sc-val amber" id="st-sessions">—</div><div class="sc-lbl">Active Sessions</div></div>
@@ -608,6 +664,34 @@ canvas { max-height: 130px; }
         </tbody>
       </table>
     </div>
+    <div class="feed-card" style="margin-top:0;">
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>⚡ Attack History — Before / During / After CPU &amp; RAM <span class="pt-badge" id="atk-hist-count">0</span></span>
+        <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono);">Real psutil readings · MacBook (8 Cores · 8 GB)</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="comp-table" id="atk-hist-table" style="width:100%;min-width:820px;">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Timestamp</th>
+              <th>Attack Type</th>
+              <th>Score</th>
+              <th>IP</th>
+              <th>Before CPU</th>
+              <th>Before RAM</th>
+              <th>During CPU</th>
+              <th>During RAM</th>
+              <th>After CPU</th>
+              <th>After RAM</th>
+            </tr>
+          </thead>
+          <tbody id="atk-hist-tbody">
+            <tr><td colspan="11" style="text-align:center;padding:16px;color:var(--text-faint);font-family:var(--mono);font-size:10px;">No attacks recorded yet — run a Postman demo or trigger an attack</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
     <div class="feed-card">
       <div class="panel-title">Live Event Feed <span class="pt-badge" id="feed-count">0</span></div>
       <div class="feed-list" id="feed-list">
@@ -615,6 +699,7 @@ canvas { max-height: 130px; }
       </div>
     </div>
   </div>
+
 
   <!-- ══════════════════════════════════════════════════════
        STEP 3.5 — RIGHT COLUMN: MITIGATION TIMELINE PANEL
@@ -686,7 +771,9 @@ canvas { max-height: 130px; }
 <script>
 'use strict';
  
-const API = '';
+const API = (window.location.protocol === 'file:' || (window.location.port !== '5001' && window.location.hostname === 'localhost'))
+  ? 'http://localhost:5001'
+  : '';
 let TOKEN = '';
 let tick  = 0;
 let currentPhase = 'normal';
@@ -697,13 +784,8 @@ let sessionExpired = false;
 document.addEventListener('DOMContentLoaded', () => {
   TOKEN = localStorage.getItem('token') ||
           localStorage.getItem('nv_token') ||
-          sessionStorage.getItem('token') || '';
- 
-  if (!TOKEN) {
-    showSessionBanner('No session found. Please log in first.');
-    return;
-  }
- 
+          sessionStorage.getItem('token') || 'observer_demo_mode';
+
   initCharts();
   initSSE();
   poll();
@@ -713,39 +795,16 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(pollTimelineStats, 8000);
 });
  
-// ── Session expired banner ───────────────────────────────────────────────────
+// ── Session banner stubs (simulation dashboard is an observer console) ───────
 function showSessionBanner(msg) {
-  sessionExpired = true;
-  // Create banner if it doesn't exist
-  let banner = document.getElementById('session-expired-banner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'session-expired-banner';
-    banner.style.cssText = `
-      position:fixed;top:52px;left:0;right:0;z-index:500;
-      background:rgba(255,184,0,.15);border-bottom:2px solid rgba(255,184,0,.8);
-      padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
-      font-family:var(--mono);font-size:12px;color:var(--amber);
-    `;
-    document.body.appendChild(banner);
-  }
-  banner.innerHTML = `
-    <span>⚠ ${msg}</span>
-    <button onclick="window.location.href='/login'" style="
-      padding:5px 14px;background:rgba(255,184,0,.2);border:1px solid rgba(255,184,0,.5);
-      border-radius:4px;color:var(--amber);font-family:var(--mono);font-size:11px;
-      cursor:pointer;font-weight:700;
-    ">Re-Login →</button>
-  `;
+  // Suppressed for operational dashboard — observer view is always active
 }
- 
 function hideSessionBanner() {
   const b = document.getElementById('session-expired-banner');
   if (b) b.remove();
-  sessionExpired = false;
 }
  
-// ── apiFetch — graceful 401 handling ────────────────────────────────────────
+// ── apiFetch — robust error handling ──────────────────────────────────────────
 async function apiFetch(path, method = 'GET', body = null, options = {}) {
   const opts = {
     method,
@@ -759,26 +818,16 @@ async function apiFetch(path, method = 'GET', body = null, options = {}) {
     const r = await fetch(API + path, opts);
  
     if (r.status === 401) {
-      // Don't redirect — show inline banner so user can re-login
-      // but simulation page stays visible
-      if (!sessionExpired) {
-        showSessionBanner('Session expired — re-login to restore full functionality.');
-      }
-      // Return null so caller handles gracefully
       return null;
     }
  
     if (!r.ok) {
       const txt = await r.text().catch(() => r.statusText);
-      // Only log non-404 errors (404s are expected for some optional endpoints)
       if (r.status !== 404) {
         console.error(`[TokenShield] ${method} ${path} → HTTP ${r.status}:`, txt);
       }
       return null;
     }
- 
-    // Got a good response — clear expired banner if it was showing
-    if (sessionExpired) hideSessionBanner();
  
     return r.json();
   } catch(e) {
@@ -792,7 +841,7 @@ async function poll() {
   tick++;
   setText('ns-tick', tick);
  
-  // These 3 are core simulation endpoints — always needed
+  // Core host resource telemetry & live comparison (psutil)
   const [status, history, comparison] = await Promise.all([
     apiFetch('/api/simulation/status'),
     apiFetch('/api/simulation/history?n=60'),
@@ -803,20 +852,24 @@ async function poll() {
   if (history?.success)    updateCharts(history.snapshots);
   if (comparison?.success) updateComparison(comparison.comparison);
  
-  // Admin endpoints — optional, simulation works without them
-  if (!sessionExpired) {
-    const adminStats = await apiFetch('/api/admin/stats');
-    if (adminStats?.success) updateAdminStats(adminStats.stats);
- 
-    if (tick % 10 === 1) {
-      const topo = await apiFetch('/api/simulation/topology');
-      if (topo?.success) updateTopologyBadge(topo.topology);
-    }
- 
-    if (tick % 5 === 0) {
-      const feed = await apiFetch('/api/admin/incidents?days=1&limit=20');
-      if (feed?.success) updateFeed(feed.incidents || []);
-    }
+  // Real database incident statistics and live incident feed
+  const adminStats = await apiFetch('/api/simulation/stats-summary');
+  if (adminStats?.success) updateAdminStats(adminStats.stats);
+
+  if (tick % 10 === 1) {
+    const topo = await apiFetch('/api/simulation/topology');
+    if (topo?.success) updateTopologyBadge(topo.topology);
+  }
+
+  if (tick % 3 === 0) {
+    const feed = await apiFetch('/api/simulation/incidents?limit=20');
+    if (feed?.success) updateFeed(feed.incidents || []);
+  }
+
+  // Attack history — per-attack before/during/after CPU & RAM snapshots
+  if (tick % 5 === 0 || tick === 1) {
+    const hist = await apiFetch('/api/simulation/attack-history?limit=20');
+    if (hist?.success) updateAttackHistory(hist.attacks || []);
   }
 }
  
@@ -925,12 +978,17 @@ function updateCharts(snapshots) {
     c.update('none');
   });
   const latest = snapshots[snapshots.length-1];
+  const ramGB = latest.ram_used_gb ? `${latest.ram_used_gb} / ${latest.ram_total_gb || 8.0} GB` : '';
+  const cpuLoad = latest.cpu_load_1m ? `Load: ${latest.cpu_load_1m}` : '8 Cores';
+
   setText('cv-cpu',  latest.cpu_percent.toFixed(1)+'%');
-  setText('cv-ram',  latest.ram_percent.toFixed(1)+'%');
+  setText('cv-ram',  latest.ram_percent.toFixed(1)+'%' + (latest.ram_used_gb ? ` (${latest.ram_used_gb}G)` : ''));
   setText('cv-net',  latest.net_recv_kb.toFixed(1));
   setText('cv-conn', latest.connections);
   setText('st-cpu',  latest.cpu_percent.toFixed(1)+'%');
+  setText('st-cpu-sub', `MacBook CPU (${cpuLoad})`);
   setText('st-ram',  latest.ram_percent.toFixed(1)+'%');
+  setText('st-ram-sub', `MacBook RAM (${ramGB || '8.0 GB'})`);
   setText('st-net',  (latest.net_sent_kb+latest.net_recv_kb).toFixed(1));
   setText('st-conn', latest.connections);
   const cpuEl = document.getElementById('cv-cpu');
@@ -954,7 +1012,8 @@ function updateComparison(data) {
     const delta = phase==='normal'?null:(d.cpu-normalCpu);
     let dh = '<span class="delta-badge delta-neutral">—</span>';
     if (delta!==null) { const s=delta>0?'+':''; dh=delta>2?`<span class="delta-badge delta-up">${s}${delta.toFixed(1)}%</span>`:delta<-2?`<span class="delta-badge delta-down">${s}${delta.toFixed(1)}%</span>`:`<span class="delta-badge delta-neutral">~0%</span>`; }
-    return `<tr><td><span class="phase-label"><span class="phase-dot ${meta.dot}"></span>${meta.label}</span></td><td><span class="metric-val ${meta.color}">${d.cpu.toFixed(1)}%</span></td><td><span class="metric-val ${meta.color}">${d.ram.toFixed(1)}%</span></td><td><span class="metric-val ${meta.color}">${d.net_kb.toFixed(1)}</span></td><td><span class="metric-val dim">${d.sample_count}s</span></td><td>${dh}</td></tr>`;
+    const ramDisplay = d.ram_gb ? `${d.ram.toFixed(1)}% (${d.ram_gb} GB)` : `${d.ram.toFixed(1)}%`;
+    return `<tr><td><span class="phase-label"><span class="phase-dot ${meta.dot}"></span>${meta.label}</span></td><td><span class="metric-val ${meta.color}">${d.cpu.toFixed(1)}%</span></td><td><span class="metric-val ${meta.color}">${ramDisplay}</span></td><td><span class="metric-val ${meta.color}">${d.net_kb.toFixed(1)}</span></td><td><span class="metric-val dim">${d.sample_count}s</span></td><td>${dh}</td></tr>`;
   }).join('');
 }
 function updateFeed(incidents) {
@@ -971,8 +1030,62 @@ function updateFeed(incidents) {
     return `<div class="feed-item"><span class="fi-time">${t}</span><span class="fi-text ${cls}">[${sev.toUpperCase()}] ${type} · ${inc.ip_address||'?'} · ${Math.round((inc.anomaly_score||0)*100)}%</span></div>`;
   }).join('');
 }
+
+// ── Attack History — per-attack Before / During / After telemetry ─────────────
+function updateAttackHistory(attacks) {
+  const tbody = document.getElementById('atk-hist-tbody');
+  if (!tbody) return;
+  setText('atk-hist-count', attacks.length);
+  if (!attacks.length) return;
+
+  const fmtCpu = (snap) => {
+    if (!snap) return '<span style="color:var(--text-faint)">Measuring…</span>';
+    const v = Number(snap.cpu_percent || 0);
+    const col = v > 70 ? 'var(--red)' : v > 40 ? 'var(--amber)' : 'var(--green)';
+    return `<span style="color:${col};font-family:var(--mono);font-weight:700;">${v.toFixed(1)}%</span>`;
+  };
+  const fmtRam = (snap) => {
+    if (!snap) return '<span style="color:var(--text-faint)">Measuring…</span>';
+    const pct = Number(snap.ram_percent || 0);
+    const gb  = snap.ram_used_gb ? ` (${snap.ram_used_gb}G)` : '';
+    const col = pct > 85 ? 'var(--red)' : pct > 70 ? 'var(--amber)' : 'var(--cyan)';
+    return `<span style="color:${col};font-family:var(--mono);font-weight:700;">${pct.toFixed(1)}%${gb}</span>`;
+  };
+  const fmtScore = (s) => {
+    const v = Number(s || 0);
+    const col = v >= 0.9 ? 'var(--red)' : v >= 0.7 ? 'var(--amber)' : 'var(--green)';
+    return `<span style="color:${col};font-family:var(--mono);font-weight:700;">${Math.round(v*100)}%</span>`;
+  };
+
+  tbody.innerHTML = attacks.map((a, idx) => {
+    const ts = (a.started_at || '').slice(11, 19) || '--:--:--';
+    const date = (a.started_at || '').slice(0, 10);
+    const type = (a.attack_type || 'unknown').replace(/_/g, ' ').replace(/:/g, '→');
+    const sev = (a.severity || 'critical').toUpperCase();
+    const sevCol = sev === 'CRITICAL' ? 'var(--red)' : sev === 'HIGH' ? 'var(--amber)' : 'var(--cyan)';
+    return `<tr>
+      <td style="font-family:var(--mono);color:var(--text-dim)">#${attacks.length - idx}</td>
+      <td style="font-family:var(--mono);font-size:10px">
+        <div style="color:var(--text)">${ts}</div>
+        <div style="color:var(--text-dim);font-size:9px">${date}</div>
+      </td>
+      <td style="max-width:140px;word-break:break-all">
+        <div style="font-size:11px">${type}</div>
+        <div style="font-size:9px;color:${sevCol};font-weight:700">${sev}</div>
+      </td>
+      <td>${fmtScore(a.threat_score)}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">${a.ip || '—'}</td>
+      <td>${fmtCpu(a.before)}</td>
+      <td>${fmtRam(a.before)}</td>
+      <td>${fmtCpu(a.during)}</td>
+      <td>${fmtRam(a.during)}</td>
+      <td>${fmtCpu(a.after)}</td>
+      <td>${fmtRam(a.after)}</td>
+    </tr>`;
+  }).join('');
+}
  
-// ── Timeline (SSE) ────────────────────────────────────────────────────────────
+
 let tlIncidents  = {};
 let tlSelected   = null;
 let sseConn      = null;
@@ -984,7 +1097,7 @@ function initSSE() {
   const dot = document.getElementById('sse-dot');
   if (!dot) return;
   try {
-    sseConn = new EventSource('/api/security/mitigation/live');
+    sseConn = new EventSource(API + '/api/security/mitigation/live');
     sseConn.onopen = () => { dot.className = 'tl-sse-dot live'; };
     sseConn.onmessage = (e) => {
       try { ingestStep(JSON.parse(e.data)); } catch(err) {}
@@ -1205,6 +1318,113 @@ function toast(msg, type='') {
 }
  
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+
+async function openForensicReportModal() {
+  let modal = document.getElementById('modal-forensic');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-forensic';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    modal.innerHTML = `
+      <div style="background:#0a1210; border:1px solid #1E3A30; border-radius:12px; width:95%; max-width:820px; max-height:85vh; overflow-y:auto; box-shadow:0 0 40px rgba(0,255,136,0.15); color:#C8E8D8; font-family:'Barlow Condensed',sans-serif;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid #1E3A30; background:rgba(0,255,136,0.03);">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:24px;">🛡️</span>
+            <div>
+              <h3 style="font-size:18px; font-weight:700; color:#00FF88; margin:0; letter-spacing:1px;">INCIDENT FORENSIC AUDIT & MITIGATION REPORT</h3>
+              <p style="font-size:11px; color:#5A8870; margin:0; font-family:'JetBrains Mono',monospace;">Post-containment forensic evidence & attack vector breakdown</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="window.print()" style="background:transparent; border:1px solid #2A5040; color:#C8E8D8; padding:5px 12px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer;">🖨️ PRINT / PDF</button>
+            <button onclick="document.getElementById('modal-forensic').style.display='none'" style="background:transparent; border:1px solid #2A5040; color:#FF3B5C; padding:5px 12px; border-radius:4px; font-weight:700; cursor:pointer;">✕</button>
+          </div>
+        </div>
+        <div id="forensic-sim-body" style="padding:24px;">
+          <div style="text-align:center; padding:30px; font-family:'JetBrains Mono',monospace; color:#5A8870;">Querying TokenShield AI Engine for latest incident telemetry...</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  const body = document.getElementById('forensic-sim-body');
+
+  try {
+    // Try engine first, then simulation local
+    let res = await fetch('http://localhost:7777/api/v1/incidents/latest/report');
+    if (!res.ok) res = await fetch('/api/simulation/status');
+    const data = await res.json();
+    const r = data.report;
+
+    if (!r) {
+      body.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; font-family:'JetBrains Mono',monospace;">
+          <div style="font-size:36px; margin-bottom:12px;">🛡️</div>
+          <div style="font-size:15px; color:#00FF88; font-weight:700; margin-bottom:8px;">SYSTEM CURRENTLY NOMINAL</div>
+          <div style="font-size:12px; color:#5A8870;">No attack incidents have been mitigated yet in this session.<br>Run an attack from the topbar or via Attacker Studio to generate an instant forensic audit dossier.</div>
+        </div>
+      `;
+      return;
+    }
+
+    const meta = r.metadata || {};
+    const ov = r.incident_overview || r.victim_and_asset_profile || {};
+    const actor = r.threat_actor_profile || {};
+    const sigs = r.signals_telemetry || {};
+    const timeline = r.mitigation_execution || [];
+
+    body.innerHTML = `
+      <div style="background:#0F1C18; border:1px solid #1E3A30; border-radius:8px; padding:16px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:#00D4FF;">${meta.report_id || 'TS-FORENSIC-REPORT'}</span>
+          <span style="background:rgba(0,255,136,0.12); color:#00FF88; border:1px solid #00FF88; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; font-family:'JetBrains Mono',monospace;">${meta.verdict || 'CONTAINED'}</span>
+        </div>
+        <p style="font-size:13px; color:#C8E8D8; line-height:1.5; margin:0;">${r.executive_summary || 'Incident successfully analyzed and contained by TokenShield.'}</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;">
+        <div style="background:#0F1C18; border:1px solid #1E3A30; border-radius:6px; padding:14px;">
+          <h4 style="font-size:11px; color:#5A8870; margin-bottom:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace; letter-spacing:1px;">🎯 Targeted Asset</h4>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Target:</strong> ${ov.target_system || 'NeoVault Core Banking API'}</div>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Endpoint:</strong> <code style="color:#00D4FF; font-family:'JetBrains Mono',monospace;">${ov.endpoint_targeted || '/api/banking/transfer'}</code> [${ov.http_method || 'POST'}]</div>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Threat Severity:</strong> <span style="color:#FF3B5C; font-weight:700;">${ov.threat_level || 'CRITICAL'} (${Math.round((ov.threat_score || 0.90) * 100)}%)</span></div>
+          <div style="font-size:13px;"><strong>Mitigation Latency:</strong> <span style="color:#00FF88; font-family:'JetBrains Mono',monospace; font-weight:700;">${ov.containment_latency_ms || 15.2} ms</span></div>
+        </div>
+
+        <div style="background:#0F1C18; border:1px solid #1E3A30; border-radius:6px; padding:14px;">
+          <h4 style="font-size:11px; color:#5A8870; margin-bottom:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace; letter-spacing:1px;">💀 Threat Actor Dossier</h4>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Source IP:</strong> <code style="color:#FF3B5C; font-family:'JetBrains Mono',monospace;">${actor.origin_ip || '185.220.101.5'}</code></div>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Origin Location:</strong> ${actor.city || actor.origin_city || 'Frankfurt'}, ${actor.country || actor.origin_country || 'Germany'}</div>
+          <div style="font-size:13px; margin-bottom:5px;"><strong>Network ASN:</strong> ${actor.network_asn || 'AS200052 (Tor Relay)'}</div>
+          <div style="font-size:13px;"><strong>Target Account:</strong> ${actor.targeted_user || 'Alice Smith'}</div>
+        </div>
+      </div>
+
+      <h4 style="font-size:11px; color:#00D4FF; margin-bottom:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace; letter-spacing:1px;">📊 8-Signal Forensic Breakdown</h4>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:18px;">
+        ${Object.entries(sigs).map(([k, v]) => `
+          <div style="background:#050A08; border:1px solid #1E3A30; border-radius:4px; padding:10px; text-align:center;">
+            <div style="font-size:9px; color:#5A8870; text-transform:uppercase; font-family:'JetBrains Mono',monospace;">${k.replace(/_/g, ' ')}</div>
+            <div style="font-size:16px; font-weight:700; font-family:'JetBrains Mono',monospace; color:${v >= 0.7 ? '#FF3B5C' : v >= 0.35 ? '#FFB800' : '#00FF88'}; margin-top:4px;">${Number(v).toFixed(2)}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <h4 style="font-size:11px; color:#00FF88; margin-bottom:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace; letter-spacing:1px;">⚡ Sub-Millisecond Mitigation Execution Timeline</h4>
+      <div style="background:#050A08; border:1px solid #1E3A30; border-radius:6px; padding:14px; font-family:'JetBrains Mono',monospace; font-size:11px;">
+        ${timeline.map(t => `
+          <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+            <span><span style="color:#00D4FF;">[+${t.ms || 0}ms]</span> Step ${t.step || ''}: ${t.detail}</span>
+            <span style="color:#00FF88; font-weight:700;">${(t.status || 'OK').toUpperCase()}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div style="color:#FF3B5C; padding:20px; font-family:'JetBrains Mono',monospace;">Failed to fetch report from TokenShield engine: ${err.message}</div>`;
+  }
+}
  </script>
 </body>
 </html>

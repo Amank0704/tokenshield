@@ -489,6 +489,7 @@ let attackToastShown = false;
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
+    localStorage.removeItem('attacker_sim');
     TOKEN = localStorage.getItem('nv_token')
          || localStorage.getItem('token')
          || localStorage.getItem('auth_token')
@@ -499,14 +500,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initUI();
     loadAll();
+    initSessionSSE();
 
-    // CHANGE 1: Updated intervals (from patch)
-    setInterval(loadShield, 5000);                 // was 30000
-    setInterval(loadSecurityEvents, 5000);          // was 10000
-    setInterval(checkAttackStatus, 5000);           // phase-based big banner
-    setInterval(checkForAttackAlert, 5000);         // NEW: score-based subtle banner
-    setInterval(refreshTransactionsQuietly, 8000);  // NEW: background txn refresh
+    // Fast background interval checks for immediate response to security events
+    setInterval(loadShield, 2500);
+    setInterval(loadSecurityEvents, 3000);
+    setInterval(checkAttackStatus, 1500);
+    setInterval(checkForAttackAlert, 1500);
+    setInterval(refreshTransactionsQuietly, 6000);
 });
+
+let sessionSSE = null;
+function initSessionSSE() {
+    if (!TOKEN) return;
+    try {
+        sessionSSE = new EventSource('/api/auth/session-events?token=' + encodeURIComponent(TOKEN));
+        sessionSSE.addEventListener('session_revoked', (e) => {
+            console.warn('TokenShield SSE Alert: Session Revoked!', e.data);
+            showAttackRevocationAlert();
+        });
+        sessionSSE.onerror = () => {
+            // fail-soft; polling will still cover it
+        };
+    } catch (err) {
+        console.log('SSE not supported or failed to connect:', err);
+    }
+}
 
 function initUI() {
     const now = new Date();
@@ -528,11 +547,28 @@ async function loadAll() {
 
 /* ── API HELPER ── */
 async function api(path, method = 'GET', body = null) {
-    const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN } };
+    localStorage.removeItem('attacker_sim');
+    const isAttackerSim = window.location.search.includes('attacker=1');
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + TOKEN
+    };
+
+    // Enables 1-computer demonstration mode from second tab with ?attacker=1
+    if (isAttackerSim) {
+        headers['X-Forwarded-For'] = '192.168.31.215';
+        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TokenShieldReplayLab/1.0';
+        headers['X-Device-Fingerprint'] = 'fp_unregistered_attacker_device_98a';
+    }
+
+    const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
     try {
         const r = await fetch(API + path, opts);
-        if (r.status === 401) { localStorage.clear(); window.location.href = '/login'; return null; }
+        if (r.status === 401) {
+            showAttackRevocationAlert();
+            return null;
+        }
         return r.json();
     } catch(e) { return null; }
 }
@@ -588,117 +624,32 @@ function renderTxns(txns) {
 
 /* ── ATTACK STATUS (phase-based big banner) ── */
 async function checkAttackStatus() {
-    const d = await api('/api/banking/attack-status');
-    if (!d?.success) return;
-
-    const phase = d.phase || 'normal';
-    if (phase === currentPhase) return;
-    currentPhase = phase;
-
-    const banner      = document.getElementById('attack-banner');
-    const accountCard = document.getElementById('account-card');
-    const alertText   = document.getElementById('acct-alert-text');
-    const shieldPill  = document.getElementById('shield-pill');
-    const pillText    = document.getElementById('shield-pill-text');
-    const statusCard  = document.getElementById('stat-status-card');
-    const stStatus    = document.getElementById('st-status');
-    const stStatusSub = document.getElementById('st-status-sub');
-    const threatEl    = document.getElementById('st-threat');
-    const transferBtn = document.getElementById('btn-transfer');
-
-    if (phase === 'under_attack') {
-        document.body.classList.add('attack-active');
-        banner.className = 'attack-banner show';
-        banner.innerHTML = `
-            <div class="attack-banner-inner">
-                <div class="attack-banner-icon">🚨</div>
-                <div class="attack-banner-text">
-                    <div class="attack-banner-title">⚠️ SECURITY BREACH DETECTED — TokenShield is blocking the attack</div>
-                    <div class="attack-banner-sub">
-                        Attacker IP: <strong style="color:#fff">${d.attacker_ip || '185.220.101.42'}</strong> &nbsp;|&nbsp;
-                        Attack: <strong style="color:#fff">${(d.attack_type||'token_theft').replace(/_/g,' ').toUpperCase()}</strong> &nbsp;|&nbsp;
-                        All transactions suspended for your protection
-                    </div>
-                </div>
-                <div class="attack-banner-badge">
-                    <div class="attack-banner-badge-val">${d.threat_score || 92}%</div>
-                    <div class="attack-banner-badge-lbl">Threat Score</div>
-                </div>
-                <div class="attack-banner-shield">
-                    <div class="attack-banner-shield-val">🛡 BLOCKING</div>
-                    <div class="attack-banner-shield-lbl">TokenShield Active</div>
-                </div>
-            </div>`;
-        accountCard.className = 'single-account-card danger';
-        alertText.classList.add('show');
-        shieldPill.className  = 'shield-pill danger';
-        pillText.textContent  = '⚠️ Attack Detected!';
-        statusCard.classList.add('alert-card');
-        stStatus.textContent    = '🔴 Under Attack';
-        stStatus.className      = 'stat-val red';
-        stStatusSub.textContent = 'TokenShield blocking threat';
-        threatEl.textContent    = (d.threat_score || 92) + '%';
-        threatEl.className      = 'stat-val red';
-        if (transferBtn) { transferBtn.disabled = true; transferBtn.textContent = '🚫 Locked'; }
-        updateShieldPanel('critical', '🚨', 'Attack Blocked', 'TokenShield is actively blocking the threat', d.threat_score || 92);
-        if (!attackToastShown) {
-            toast('err', '🚨 Attack Detected!', `Threat from ${d.attacker_ip || 'unknown'} — TokenShield blocking`);
-            attackToastShown = true;
+    try {
+        const r = await fetch(API + '/api/banking/attack-status', {
+            headers: { 'Authorization': 'Bearer ' + TOKEN }
+        });
+        const d = await r.json();
+        const banner = document.getElementById('attack-alert-banner');
+        if (d && d.under_attack) {
+            console.warn('NeoVault Bank: active threat detected by TokenShield!', d.attacker_ip);
+            if (banner) {
+                banner.style.display = 'flex';
+                banner.style.borderColor = '#DC2626';
+                banner.style.background = 'rgba(220,38,38,.12)';
+                document.getElementById('attack-alert-score').textContent = (d.threat_score || 95) + '%';
+                document.getElementById('attack-alert-score').style.color = '#DC2626';
+                document.getElementById('attack-alert-level').textContent = '🚨 ATTACK MITIGATED: ' + (d.attack_type || 'HIGH RISK').toUpperCase();
+                document.getElementById('attack-alert-level').style.color = '#DC2626';
+            }
+        } else {
+            if (banner) {
+                banner.style.display = 'none';
+            }
         }
-
-    } else if (phase === 'post_mitigation') {
-        document.body.classList.remove('attack-active');
-        attackToastShown = false;
-        banner.className = 'attack-banner show';
-        banner.innerHTML = `
-            <div class="mitigated-banner-inner">
-                <div class="attack-banner-icon">✅</div>
-                <div class="attack-banner-text">
-                    <div class="attack-banner-title">✅ THREAT NEUTRALISED — Your account is secure</div>
-                    <div class="attack-banner-sub">Attacker IP blocked at network edge · Session revoked · Fingerprint banned · Account restored</div>
-                </div>
-                <div class="attack-banner-shield">
-                    <div class="attack-banner-shield-val">🛡 SECURED</div>
-                    <div class="attack-banner-shield-lbl">TokenShield</div>
-                </div>
-            </div>`;
-        accountCard.className = 'single-account-card safe';
-        alertText.classList.remove('show');
-        shieldPill.className  = 'shield-pill';
-        pillText.textContent  = 'TokenShield™ Active';
-        statusCard.classList.remove('alert-card');
-        stStatus.textContent    = '🟢 Secure';
-        stStatus.className      = 'stat-val green';
-        stStatusSub.textContent = 'Threat neutralised';
-        threatEl.textContent    = '0%';
-        threatEl.className      = 'stat-val green';
-        if (transferBtn) { transferBtn.disabled = false; transferBtn.textContent = '↗ Transfer'; }
-        updateShieldPanel('safe', '✅', 'Threat Neutralised', 'Attack blocked. Account fully secured.', 0);
-        toast('ok', '✅ Threat Neutralised', 'TokenShield blocked the attack. Your account is safe.');
-        setTimeout(() => { banner.className = 'attack-banner'; document.body.classList.remove('attack-active'); }, 8000);
-
-    } else {
-        document.body.classList.remove('attack-active');
-        attackToastShown = false;
-        banner.className = 'attack-banner';
-        accountCard.className = 'single-account-card safe';
-        alertText.classList.remove('show');
-        shieldPill.className  = 'shield-pill';
-        pillText.textContent  = 'TokenShield™ Active';
-        statusCard.classList.remove('alert-card');
-        stStatus.textContent    = '🟢 Secure';
-        stStatus.className      = 'stat-val green';
-        stStatusSub.textContent = 'TokenShield monitoring';
-        threatEl.textContent    = '0%';
-        threatEl.className      = 'stat-val green';
-        if (transferBtn) { transferBtn.disabled = false; transferBtn.textContent = '↗ Transfer'; }
-        updateShieldPanel('safe', '✅', 'Account Secure', 'No threats detected. All signals clear.', 0);
-    }
+    } catch(e) {}
 }
 
-/* ── CHANGE 2: NEW FUNCTIONS FROM PATCH ── */
-
-// Checks anomaly score from dashboard/stats and shows subtle banner
+/* ── TokenShield Alert Banner (fires immediately on session revocation) ── */
 async function checkForAttackAlert() {
     const d = await api('/api/dashboard/stats');
     if (!d || !d.success) return;
@@ -706,8 +657,9 @@ async function checkForAttackAlert() {
     const score    = Number(d.stats?.current_session?.anomaly_score || 0);
     const isActive = d.stats?.current_session?.is_active !== false;
 
-    // Session was revoked — show full-screen overlay
+    // If session was revoked in DB by TokenShield mitigation:
     if (!isActive) {
+        console.warn('Session has been revoked by TokenShield!');
         showAttackRevocationAlert();
         return;
     }
@@ -715,17 +667,21 @@ async function checkForAttackAlert() {
     const banner = document.getElementById('attack-alert-banner');
     if (!banner) return;
 
-    if (score >= 0.5) {
+    if (score >= 0.70) {
         const pct   = Math.round(score * 100);
-        const level = score >= 0.85 ? 'CRITICAL' : score >= 0.7 ? 'HIGH' : 'ELEVATED';
-        const color = score >= 0.85 ? '#DC2626' : score >= 0.7 ? '#EF4444' : '#D97706';
+        const level = score >= 0.85 ? 'CRITICAL' : 'HIGH';
+        const color = '#DC2626';
         banner.style.display      = 'flex';
         banner.style.borderColor  = color;
-        banner.style.background   = `rgba(${score >= 0.7 ? '220,38,38' : '217,119,6'},.08)`;
+        banner.style.background   = `rgba(220,38,38,.08)`;
         document.getElementById('attack-alert-score').textContent = pct + '%';
         document.getElementById('attack-alert-score').style.color = color;
         document.getElementById('attack-alert-level').textContent = '🚨 ' + level + ' RISK DETECTED';
         document.getElementById('attack-alert-level').style.color = color;
+
+        if (score >= 0.85) {
+            showAttackRevocationAlert();
+        }
     } else {
         banner.style.display = 'none';
     }
@@ -758,7 +714,7 @@ function showAttackRevocationAlert() {
                         padding:12px;margin-bottom:20px;font-size:12px;color:#991B1B;">
                 ⚠ Your account remains secure. This is TokenShield protecting you.
             </div>
-            <button onclick="doLogout()" style="
+            <button onclick="reAuth()" style="
                 width:100%;padding:12px;background:#DC2626;color:#fff;border:none;
                 border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
                 font-family:'Inter',sans-serif;
@@ -887,6 +843,11 @@ function toast(type, title, msg) {
     setTimeout(() => el.remove(), 5000);
 }
 
+function reAuth() {
+    localStorage.clear();
+    window.location.href = '/login';
+}
+
 async function doLogout() {
     if (!confirm('Sign out of NeoVault?')) return;
     try { await api('/api/auth/logout', 'POST'); } catch {}
@@ -894,5 +855,6 @@ async function doLogout() {
     window.location.href = '/login';
 }
 </script>
+<script src="/js/behavioral_collector.js"></script>
 </body>
 </html>

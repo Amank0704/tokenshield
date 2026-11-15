@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TokenShield / NeoVault — Comprehensive Codebase & Architecture Analysis Report</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.6;
+      margin: 0;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid var(--border-color);
+    }
+    h1, h2, h3, h4 {
+      color: var(--accent);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    h1 { font-size: 2.2rem; margin-top: 0; }
+    h2 { font-size: 1.6rem; margin-top: 30px; }
+    h3 { font-size: 1.2rem; margin-top: 20px; color: #7dd3fc; border-bottom: none; }
+    blockquote {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 4px solid var(--accent);
+      margin: 0 0 20px 0;
+      padding: 12px 20px;
+      color: var(--text-muted);
+    }
+    code {
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      background: #090d16;
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: #38bdf8;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #090d16;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+    }
+    pre code { background: none; padding: 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.95em;
+    }
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      background-color: #0f172a;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    tr:hover { background-color: rgba(255,255,255,0.02); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: bold;
+    }
+    .badge-critical { background: rgba(239,68,68,0.2); color: var(--danger); border: 1px solid var(--danger); }
+    .badge-high { background: rgba(245,158,11,0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-safe { background: rgba(34,197,94,0.2); color: var(--success); border: 1px solid var(--success); }
+    hr { border: 0; height: 1px; background: var(--border-color); margin: 30px 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🛡️ TokenShield / NeoVault — Architecture Analysis Report</h1>
+  <blockquote>
+    <strong>Project:</strong> TokenShield — AI-Powered Session Security & NeoVault Banking System<br>
+    <strong>Path:</strong> <code>/Users/yashpachhade/tokenshield</code><br>
+    <strong>Version:</strong> 3.5 | <strong>Date:</strong> July 30, 2026
+  </blockquote>
+
+  <h2>1. Executive Summary</h2>
+  <p><strong>TokenShield</strong> is an enterprise-grade, AI-driven session security and threat mitigation engine designed to protect modern web applications and digital banking platforms (represented by <strong>NeoVault / Alpha Bank</strong>). Unlike traditional Web Application Firewalls (WAFs) or static IP rate limiters, TokenShield evaluates request risk continuously in real time using a <strong>7-Signal Real-Time Threat Analysis Pipeline</strong>.</p>
+  <p>When a high-risk or malicious request is detected (anomaly score &ge; 0.85), TokenShield triggers an automated, multi-tiered <strong>8-Step Progressive Mitigation Pipeline</strong> that isolates the session in sub-millisecond speeds, updates Redis blocklists, reloads Nginx edge rules atomically, bans device fingerprints, locks user accounts behind mandatory TOTP 2FA, and notifies security administrators via Server-Sent Events (SSE) and email alerts.</p>
+
+  <h2>2. Infrastructure & System Topology</h2>
+  <p>The system is containerized via Docker Compose across a <code>172.20.0.0/24</code> subnet:</p>
+  <pre><code>+-----------------------------------------------------------------------------------+
+|                         Nginx Proxy / WAF (172.20.0.3:80)                          |
++-----------------------------------------------------------------------------------+
+                                          | (Reverse Proxy)
+                                          v
++-----------------------------------------------------------------------------------+
+|                     TokenShield Flask Server (172.20.0.2:5001)                    |
++-----------------------------------------------------------------------------------+
+                    |                                           |
+         (O(1) Redis Check)                            (DB Read/Write)
+                    v                                           v
++-----------------------+                       +-----------------------+
+|  Redis Cache / State  |                       |    SQLite Database    |
+| (172.20.0.4:6379)     |                       |    (tokenshield.db)   |
++-----------------------+                       +-----------------------+</code></pre>
+
+  <h2>3. Core TokenShield Security Engine Architecture</h2>
+  <h3>The 7-Signal Threat Analysis Pipeline (<code>app/middleware/detection.py</code>)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal</th>
+        <th>Name</th>
+        <th>Max Weight</th>
+        <th>Source Module</th>
+        <th>Mechanics</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Signal 1</strong></td>
+        <td>IP Reputation</td>
+        <td><code>0.25</code></td>
+        <td><code>ip_reputation.py</code></td>
+        <td>Tor exit nodes, hostile botnets, datacenter CIDRs, IPinfo live API.</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 2</strong></td>
+        <td>Request Velocity</td>
+        <td><code>0.30</code></td>
+        <td><code>velocity.py</code></td>
+        <td>Redis 60s sliding window counters.</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 3</strong></td>
+        <td>Session Consistency</td>
+        <td><code>0.30</code></td>
+        <td><code>detection.py</code></td>
+        <td>IP & User-Agent drift detection.</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 4</strong></td>
+        <td>Payload Analysis</td>
+        <td><code>0.40</code></td>
+        <td><code>detection.py</code></td>
+        <td>Regex detection for SQLi and XSS patterns.</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 5</strong></td>
+        <td>Behavioral Biometrics</td>
+        <td><code>0.25</code></td>
+        <td><code>detection.py</code></td>
+        <td>Client-side mouse and typing telemetry.</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 6</strong></td>
+        <td>Geographic Impossibility</td>
+        <td><code>0.35</code></td>
+        <td><code>geo.py</code></td>
+        <td>Haversine distance & travel speed (&gt;900 km/h).</td>
+      </tr>
+      <tr>
+        <td><strong>Signal 7</strong></td>
+        <td>Endpoint Pattern Risk</td>
+        <td><code>0.20</code></td>
+        <td><code>detection.py</code></td>
+        <td>Sensitive endpoint weighting (/api/auth, /api/banking/transfer).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Multi-Layer Automated Mitigation Pipeline</h2>
+  <ol>
+    <li><strong>Step 1: O(1) Redis Token Revocation</strong> — Invalidate session token in Redis (<code>ts:block:*</code>).</li>
+    <li><strong>Step 2: Redis IP Block</strong> — Set 24h IP block key.</li>
+    <li><strong>Step 3: Nginx Edge Block</strong> — Write <code>deny &lt;ip&gt;;</code> to Nginx config and reload edge server.</li>
+    <li><strong>Step 4: Device Fingerprint Ban</strong> — Ban browser fingerprint in Redis (<code>ts:fp:*</code>).</li>
+    <li><strong>Step 5: Account 2FA Lockout</strong> — Set Soft Lock (failed attempts = 99) or Hard Lock.</li>
+    <li><strong>Step 6: Coordinated Attack Check</strong> — Correlate attack patterns across multiple accounts.</li>
+    <li><strong>Step 7: Automated SMTP Email Alerts</strong> — Send security incident notifications.</li>
+    <li><strong>Step 8: Live Dashboard SSE Push</strong> — Stream mitigation metrics to UI.</li>
+  </ol>
+
+  <h2>5. Comprehensive File Index</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>File Path</th>
+        <th>Size</th>
+        <th>Role & Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>run.py</code></td><td>1.26 KB</td><td>Application entry point & Flask runner.</td></tr>
+      <tr><td><code>config.py</code></td><td>2.91 KB</td><td>Environment configurations & JWT thresholds.</td></tr>
+      <tr><td><code>app/__init__.py</code></td><td>6.16 KB</td><td>Flask app factory & blueprint registration.</td></tr>
+      <tr><td><code>app/models.py</code></td><td>13.69 KB</td><td>SQLAlchemy database models & indices.</td></tr>
+      <tr><td><code>app/middleware/detection.py</code></td><td>17.29 KB</td><td>Master 7-signal threat analysis engine.</td></tr>
+      <tr><td><code>app/middleware/velocity.py</code></td><td>7.41 KB</td><td>Redis sliding window velocity tracker.</td></tr>
+      <tr><td><code>app/middleware/geo.py</code></td><td>12.46 KB</td><td>Haversine geographic velocity scorer.</td></tr>
+      <tr><td><code>app/middleware/ip_reputation.py</code></td><td>12.44 KB</td><td>IP threat intel CIDR matcher & IPinfo lookup.</td></tr>
+      <tr><td><code>app/middleware/fingerprint.py</code></td><td>6.79 KB</td><td>Device fingerprint ban manager.</td></tr>
+      <tr><td><code>app/middleware/account_lock.py</code></td><td>8.29 KB</td><td>2FA account lockout engine.</td></tr>
+      <tr><td><code>app/middleware/nginx_block.py</code></td><td>7.60 KB</td><td>Dynamic Nginx edge block writer.</td></tr>
+      <tr><td><code>app/banking_routes.py</code></td><td>31.96 KB</td><td>NeoVault banking API routes.</td></tr>
+      <tr><td><code>app/security_routes.py</code></td><td>63.14 KB</td><td>Security engine monitoring & control endpoints.</td></tr>
+      <tr><td><code>app/routes/attack_simulator.py</code></td><td>33.63 KB</td><td>Offensive attack scenario triggers.</td></tr>
+      <tr><td><code>scripts/train_ml_model.py</code></td><td>13.46 KB</td><td>Isolation Forest ML model training pipeline.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Key Technical Summary</h2>
+  <ul>
+    <li><strong>Sub-Second Threat Isolation:</strong> The 7-signal scoring and 8-step mitigation workflow isolate attacks in sub-millisecond timeframes.</li>
+    <li><strong>Hybrid Persistence:</strong> High-speed Redis in-memory storage combined with robust SQLite database logging.</li>
+    <li><strong>Integrated Testing Suite:</strong> Full attack simulation, JMeter load testing, and OWASP ZAP scanning.</li>
+  </ul>
+</div>
+</body>
+</html>

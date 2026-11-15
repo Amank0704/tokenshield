@@ -1,228 +1,494 @@
 """
-TokenShield — Step 3.4: Account 2FA Lock
-=========================================
-When a session is auto-revoked (score >= 0.85), the associated user
-account is locked behind mandatory TOTP 2FA.
+TokenShield — Step 3.4: Account Lock
+====================================
 
-What this achieves
-------------------
-Steps 1–3 block the current session / IP / device.
-Step 4 goes one level deeper: even if the attacker:
-  - Gets past IP blocking (new VPN)
-  - Clears cookies / gets a new fingerprint
-  - Has the victim's username + password
+Handles account-level locking after TokenShield detects suspicious
+session activity.
 
-...they still cannot log in without the TOTP code from the
-victim's authenticator app. The account is protected at the
-authentication layer, not just the session layer.
+Lock modes
+----------
+SOFT LOCK
+    failed_login_attempts is set to 99.
+    The authentication layer can require additional verification.
 
-Two lock modes
---------------
-SOFT LOCK  (default on auto-revoke)
-  failed_login_attempts set to 99.
-  Auth route already gates on this (>= 99 → requires 2FA).
-  User must complete /api/auth/login-2fa with their TOTP code.
-  If they don't have TOTP set up, they call /api/auth/request-unlock
-  which emails them a one-time code (Step 3.5 hooks in here).
+HARD LOCK
+    is_active is set to False.
+    The account cannot log in until an administrator explicitly unlocks it.
 
-HARD LOCK  (admin-triggered, or coordinated attack detected)
-  is_active set to False.
-  Account is completely disabled until admin unlocks it.
-  Used by Step 6.1 (coordinated attack detection).
+Redis
+-----
+    ts:lock:{user_id}
 
-Redis state
------------
-  ts:lock:{user_id}   →  JSON { reason, locked_at, lock_type, session_id }
-  TTL: 24 hours
-  Survives Flask restart. Admin dashboard reads this key to show
-  which accounts are currently locked.
+Redis is used as a fast lock-state cache. The database remains the
+persistent source of truth.
 
-Fallback
---------
-If Redis is unavailable, the lock is still written to the DB
-(failed_login_attempts = 99). Redis is the fast read path;
-DB is the source of truth.
+Important
+---------
+Unlocking an account does NOT remove the user's TOTP configuration.
+The administrator is only clearing the security lock.
 """
 
 import json
 import logging
+
 from datetime import datetime
 from typing import Optional
 
+
 logger = logging.getLogger("tokenshield.account_lock")
 
-LOCK_PREFIX  = "ts:lock:"
-LOCK_TTL     = 24 * 3600       # 24 hours
-SOFT_LOCK_THRESHOLD = 99       # matches auth.py gate
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+LOCK_PREFIX = "ts:lock:"
+
+# Redis lock metadata lifetime.
+LOCK_TTL = 24 * 3600
+
+# Value used by auth.py to recognize a soft lock.
+SOFT_LOCK_THRESHOLD = 99
 
 
-# ---------------------------------------------------------------------------
-# Core lock / unlock
-# ---------------------------------------------------------------------------
+# ============================================================================
+# SOFT LOCK
+# ============================================================================
 
-def soft_lock_account(user_id: int, session_id: int, reason: str) -> bool:
+def soft_lock_account(
+    user_id: int,
+    session_id: int,
+    reason: str,
+) -> bool:
     """
-    Apply a soft lock to a user account:
-      - Sets failed_login_attempts = 99 in DB (triggers 2FA gate in auth.py)
-      - Writes lock record to Redis (fast read by dashboard)
+    Apply a soft security lock to an account.
 
-    Returns True if DB write succeeded.
+    Database:
+        failed_login_attempts = 99
+
+    Redis:
+        Stores lock metadata.
+
+    Returns:
+        True if the database update succeeded.
     """
-    success = _write_db_lock(user_id, soft=True)
-    _write_redis_lock(user_id, session_id, reason, lock_type="soft")
+
+    success = _write_db_lock(
+        user_id=user_id,
+        soft=True,
+    )
+
+    _write_redis_lock(
+        user_id=user_id,
+        session_id=session_id,
+        reason=reason,
+        lock_type="soft",
+    )
+
     if success:
         logger.warning(
-            "tokenshield.account_lock: SOFT LOCK uid=%d sid=%d reason=%s",
-            user_id, session_id, reason,
+            "TokenShield SOFT LOCK | uid=%d | sid=%d | reason=%s",
+            user_id,
+            session_id,
+            reason,
         )
+
     return success
 
 
-def hard_lock_account(user_id: int, session_id: int, reason: str) -> bool:
-    """
-    Apply a hard lock to a user account:
-      - Sets is_active = False in DB (blocks all logins)
-      - Writes lock record to Redis
+# ============================================================================
+# HARD LOCK
+# ============================================================================
 
-    Returns True if DB write succeeded.
-    Admin must call unlock_account() to restore access.
+def hard_lock_account(
+    user_id: int,
+    session_id: int,
+    reason: str,
+) -> bool:
     """
-    success = _write_db_lock(user_id, soft=False)
-    _write_redis_lock(user_id, session_id, reason, lock_type="hard")
+    Apply a complete account-level lock.
+
+    Database:
+        is_active = False
+        failed_login_attempts = 99
+
+    Redis:
+        Stores lock metadata.
+
+    A hard-locked account cannot authenticate again until
+    unlock_account() is explicitly called.
+
+    Returns:
+        True if the database update succeeded.
+    """
+
+    success = _write_db_lock(
+        user_id=user_id,
+        soft=False,
+    )
+
+    _write_redis_lock(
+        user_id=user_id,
+        session_id=session_id,
+        reason=reason,
+        lock_type="hard",
+    )
+
     if success:
         logger.warning(
-            "tokenshield.account_lock: HARD LOCK uid=%d sid=%d reason=%s",
-            user_id, session_id, reason,
+            "TokenShield HARD LOCK | uid=%d | sid=%d | reason=%s",
+            user_id,
+            session_id,
+            reason,
         )
+
     return success
 
+
+# ============================================================================
+# UNLOCK
+# ============================================================================
 
 def unlock_account(user_id: int) -> bool:
     """
-    Clear all locks on a user account:
-      - Resets failed_login_attempts = 0, is_active = True in DB
-      - Removes Redis lock key
+    Unlock a previously locked account.
 
-    Returns True if DB write succeeded.
+    Database:
+        failed_login_attempts = 0
+        is_active = True
+
+    Redis:
+        Lock metadata is removed.
+
+    IMPORTANT:
+        TOTP configuration is intentionally preserved.
+
+    Returns:
+        True if the database update succeeded.
     """
+
     success = _clear_db_lock(user_id)
+
     _clear_redis_lock(user_id)
+
     if success:
-        logger.info("tokenshield.account_lock: UNLOCKED uid=%d", user_id)
+        logger.info(
+            "TokenShield ACCOUNT UNLOCKED | uid=%d",
+            user_id,
+        )
+
     return success
 
 
-def is_account_locked(user_id: int) -> tuple[bool, Optional[dict]]:
+# ============================================================================
+# CHECK LOCK STATUS
+# ============================================================================
+
+def is_account_locked(
+    user_id: int,
+) -> tuple[bool, Optional[dict]]:
     """
-    Check whether a user account is currently locked.
-    Reads from Redis first (fast), falls back to DB.
-    Returns (locked: bool, lock_info: dict | None).
+    Check whether an account is currently locked.
+
+    Redis is checked first for fast access.
+    Database is used as the fallback/source of truth.
+
+    Returns:
+        (
+            locked: bool,
+            lock_info: dict | None
+        )
     """
+
+    # ------------------------------------------------------------------------
     # Redis fast path
+    # ------------------------------------------------------------------------
+
     try:
         from app.middleware.redis_client import get_redis
-        r = get_redis()
-        if r:
-            raw = r.get(LOCK_PREFIX + str(user_id))
-            if raw:
-                return True, json.loads(raw)
-    except Exception as exc:
-        logger.debug("tokenshield.account_lock: Redis read failed — %s", exc)
 
-    # DB fallback
+        redis_client = get_redis()
+
+        if redis_client:
+            raw = redis_client.get(
+                LOCK_PREFIX + str(user_id)
+            )
+
+            if raw:
+                if isinstance(raw, bytes):
+                    raw = raw.decode("utf-8")
+
+                try:
+                    return True, json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.warning(
+                        "TokenShield invalid Redis lock record | uid=%d",
+                        user_id,
+                    )
+
+    except Exception as exc:
+        logger.debug(
+            "TokenShield Redis lock check failed | %s",
+            exc,
+        )
+
+    # ------------------------------------------------------------------------
+    # Database fallback
+    # ------------------------------------------------------------------------
+
     try:
         from app.models import User
+
         user = User.query.get(user_id)
+
         if user is None:
             return False, None
+
+        # Hard lock
         if not user.is_active:
-            return True, {"lock_type": "hard", "reason": "account_disabled"}
-        if (user.failed_login_attempts or 0) >= SOFT_LOCK_THRESHOLD:
-            return True, {"lock_type": "soft", "reason": "failed_attempts_threshold"}
+            return True, {
+                "user_id": user_id,
+                "lock_type": "hard",
+                "reason": "account_disabled",
+            }
+
+        # Soft lock
+        if (
+            user.failed_login_attempts or 0
+        ) >= SOFT_LOCK_THRESHOLD:
+
+            return True, {
+                "user_id": user_id,
+                "lock_type": "soft",
+                "reason": "failed_attempts_threshold",
+            }
+
         return False, None
+
     except Exception as exc:
-        logger.error("tokenshield.account_lock: DB check failed — %s", exc)
+        logger.error(
+            "TokenShield database lock check failed | %s",
+            exc,
+        )
+
         return False, None
 
 
-def get_lock_info(user_id: int) -> Optional[dict]:
-    """Return the Redis lock record for a user, or None if not locked."""
+# ============================================================================
+# GET LOCK INFORMATION
+# ============================================================================
+
+def get_lock_info(
+    user_id: int,
+) -> Optional[dict]:
+    """
+    Return Redis lock metadata for a user.
+
+    Returns:
+        dict if a Redis lock exists, otherwise None.
+    """
+
     try:
         from app.middleware.redis_client import get_redis
-        r = get_redis()
-        if r:
-            raw = r.get(LOCK_PREFIX + str(user_id))
-            if raw:
-                return json.loads(raw)
-    except Exception:
-        pass
-    return None
 
+        redis_client = get_redis()
+
+        if not redis_client:
+            return None
+
+        raw = redis_client.get(
+            LOCK_PREFIX + str(user_id)
+        )
+
+        if not raw:
+            return None
+
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+
+    except Exception:
+        return None
+
+
+# ============================================================================
+# LOCKED ACCOUNT COUNT
+# ============================================================================
 
 def locked_accounts_count() -> int:
-    """Return number of currently locked accounts tracked in Redis."""
+    """
+    Return the number of accounts currently represented by
+    TokenShield lock keys in Redis.
+
+    Redis may be unavailable, in which case zero is returned.
+    """
+
     try:
         from app.middleware.redis_client import get_redis
-        r = get_redis()
-        if r:
-            return len(r.keys(LOCK_PREFIX + "*"))
+
+        redis_client = get_redis()
+
+        if not redis_client:
+            return 0
+
+        keys = redis_client.keys(
+            LOCK_PREFIX + "*"
+        )
+
+        return len(keys)
+
     except Exception:
-        pass
-    return 0
+        return 0
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+# ============================================================================
+# INTERNAL — DATABASE LOCK
+# ============================================================================
 
-def _write_db_lock(user_id: int, soft: bool) -> bool:
-    """Write the DB-side lock. Returns True on success."""
+def _write_db_lock(
+    user_id: int,
+    soft: bool,
+) -> bool:
+    """
+    Write the persistent account-lock state to the database.
+    """
+
     try:
         from app.extensions import db
         from app.models import User
+
         user = User.query.get(user_id)
+
         if user is None:
+            logger.warning(
+                "TokenShield lock failed: user not found | uid=%d",
+                user_id,
+            )
             return False
+
+        # --------------------------------------------------------------------
+        # SOFT LOCK
+        # --------------------------------------------------------------------
+
         if soft:
-            user.failed_login_attempts = SOFT_LOCK_THRESHOLD
+            user.failed_login_attempts = (
+                SOFT_LOCK_THRESHOLD
+            )
+
+        # --------------------------------------------------------------------
+        # HARD LOCK
+        # --------------------------------------------------------------------
+
         else:
-            user.is_active             = False
-            user.failed_login_attempts = SOFT_LOCK_THRESHOLD
+            user.is_active = False
+
+            user.failed_login_attempts = (
+                SOFT_LOCK_THRESHOLD
+            )
+
         db.session.commit()
+
         return True
+
     except Exception as exc:
-        logger.error("tokenshield.account_lock: DB write failed — %s", exc)
+
+        logger.error(
+            "TokenShield database lock write failed | %s",
+            exc,
+        )
+
         try:
             from app.extensions import db
+
             db.session.rollback()
+
         except Exception:
             pass
+
         return False
 
 
-def _clear_db_lock(user_id: int) -> bool:
-    """Clear the DB-side lock. Returns True on success."""
+# ============================================================================
+# INTERNAL — DATABASE UNLOCK
+# ============================================================================
+
+def _clear_db_lock(
+    user_id: int,
+) -> bool:
+    """
+    Clear the persistent database lock.
+
+    IMPORTANT:
+    TOTP configuration is deliberately NOT changed here.
+
+    The user may already have a working authenticator configured,
+    and unlocking an account should not silently remove it.
+    """
+
     try:
         from app.extensions import db
         from app.models import User
-        user = User.query.get(user_id)
+
+        user = None
+        if isinstance(user_id, str):
+            if user_id.isdigit():
+                user = User.query.get(int(user_id))
+            else:
+                user = User.query.filter(
+                    (User.email == user_id) | (User.username == user_id)
+                ).first()
+        else:
+            user = User.query.get(user_id)
+
         if user is None:
+            logger.warning(
+                "TokenShield unlock failed: user not found | uid=%s",
+                user_id,
+            )
             return False
+
+        # Clear authentication lock.
         user.failed_login_attempts = 0
-        user.is_active             = True
-        user.totp_secret           = None
-        user.totp_enabled          = False
+
+        # Re-enable account.
+        user.is_active = True
+
+        # DO NOT do this:
+        #
+        # user.totp_secret = None
+        # user.totp_enabled = False
+        #
+        # TOTP must remain configured.
+
         db.session.commit()
+
         return True
+
     except Exception as exc:
-        logger.error("tokenshield.account_lock: DB clear failed — %s", exc)
+
+        logger.error(
+            "TokenShield database unlock failed | %s",
+            exc,
+        )
+
         try:
             from app.extensions import db
+
             db.session.rollback()
+
         except Exception:
             pass
+
         return False
 
+
+# ============================================================================
+# INTERNAL — REDIS LOCK
+# ============================================================================
 
 def _write_redis_lock(
     user_id: int,
@@ -230,30 +496,71 @@ def _write_redis_lock(
     reason: str,
     lock_type: str,
 ) -> None:
-    """Write lock metadata to Redis. Fails silently."""
+    """
+    Store lock metadata in Redis.
+
+    Redis failures are intentionally non-fatal because the database
+    remains the persistent source of truth.
+    """
+
     try:
         from app.middleware.redis_client import get_redis
-        r = get_redis()
-        if r is None:
+
+        redis_client = get_redis()
+
+        if redis_client is None:
             return
-        record = json.dumps({
-            "user_id":    user_id,
+
+        record = {
+            "user_id": user_id,
             "session_id": session_id,
-            "reason":     reason,
-            "lock_type":  lock_type,
-            "locked_at":  datetime.utcnow().isoformat(),
-        })
-        r.setex(LOCK_PREFIX + str(user_id), LOCK_TTL, record)
+            "reason": reason,
+            "lock_type": lock_type,
+            "locked_at": datetime.utcnow().isoformat(),
+        }
+
+        redis_client.setex(
+            LOCK_PREFIX + str(user_id),
+            LOCK_TTL,
+            json.dumps(record),
+        )
+
     except Exception as exc:
-        logger.debug("tokenshield.account_lock: Redis write failed — %s", exc)
+
+        logger.debug(
+            "TokenShield Redis lock write failed | %s",
+            exc,
+        )
 
 
-def _clear_redis_lock(user_id: int) -> None:
-    """Remove lock key from Redis. Fails silently."""
+# ============================================================================
+# INTERNAL — REDIS UNLOCK
+# ============================================================================
+
+def _clear_redis_lock(
+    user_id: int,
+) -> None:
+    """
+    Remove the Redis lock record.
+    """
+
     try:
         from app.middleware.redis_client import get_redis
-        r = get_redis()
-        if r:
-            r.delete(LOCK_PREFIX + str(user_id))
+
+        redis_client = get_redis()
+
+        if redis_client:
+            redis_client.delete(
+                LOCK_PREFIX + str(user_id)
+            )
+            if isinstance(user_id, str) and not user_id.isdigit():
+                try:
+                    from app.models import User
+                    u = User.query.filter((User.email == user_id) | (User.username == user_id)).first()
+                    if u:
+                        redis_client.delete(LOCK_PREFIX + str(u.id))
+                except Exception:
+                    pass
+
     except Exception:
         pass

@@ -1,0 +1,149 @@
+{
+  "info": {
+    "_postman_id": "tokenshield-attack-suite-v3",
+    "name": "TokenShield Red Team Attack Suite (GUI Software Demo)",
+    "description": "Collection of real penetration testing & security attack requests for demonstrating TokenShield defense in Postman / Insomnia without using terminal commands.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Session Hijacking (Stolen Token Replay from Tor Node)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer PASTE_YOUR_STOLEN_JWT_HERE",
+            "description": "Paste the JWT token stolen from Chrome DevTools Application > Local Storage"
+          },
+          {
+            "key": "X-Forwarded-For",
+            "value": "185.220.101.5",
+            "description": "Attacker IP: Known Tor Exit Node in Frankfurt, Germany"
+          },
+          {
+            "key": "X-Real-IP",
+            "value": "185.220.101.5"
+          },
+          {
+            "key": "User-Agent",
+            "value": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0 (Kali Linux)",
+            "description": "Attacker User-Agent differs from victim's Chrome browser"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 75000,\n  \"to_account\": \"ATTACKER-OFFSHORE-01\",\n  \"description\": \"Fraudulent Wire Transfer\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5001/api/banking/transfer",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "banking", "transfer"]
+        },
+        "description": "Demonstrates Token Theft (Signal 3: Session drift, Signal 1: Tor node, Signal 6: Impossible travel). Engine catches and blocks the transaction."
+      }
+    },
+    {
+      "name": "2. SQL Injection Attack (UNION SELECT Exploit)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"1001' UNION SELECT credit_card_num, cvv FROM cards--\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5001/api/banking/search",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "banking", "search"]
+        },
+        "description": "Demonstrates Payload Analysis (Signal 4 & Layer 5). Engine scans query payload, detects SQL injection syntax, and blocks."
+      }
+    },
+    {
+      "name": "3. High-Rate API Flood (Run with Collection Runner)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"flood_demo_session\",\n  \"ip\": \"198.51.100.88\",\n  \"path\": \"/api/banking/search\",\n  \"method\": \"POST\",\n  \"payload\": {\"query\": \"probe_account_99\"}\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7777/api/v1/analyze",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "7777",
+          "path": ["api", "v1", "analyze"]
+        },
+        "description": "Run this in Postman's Collection Runner with 50-100 iterations. Watch Signal 2 (Velocity Tracker) climb and block excess requests."
+      }
+    },
+    {
+      "name": "4. Supersonic Impossible Travel (Frankfurt to Mumbai)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"geo_test_session_live\",\n  \"ip\": \"185.107.80.12\",\n  \"path\": \"/api/banking/accounts\",\n  \"method\": \"GET\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7777/api/v1/analyze",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "7777",
+          "path": ["api", "v1", "analyze"]
+        },
+        "description": "Demonstrates Haversine Impossible Travel (Signal 6 & Layer 3). Jump of 6,800 km in under 1 second."
+      }
+    },
+    {
+      "name": "5. Inhuman Bot Behavioral Biometrics",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"bot_session_live\",\n  \"user_id\": \"alice@neovault.com\",\n  \"ip\": \"198.51.100.99\",\n  \"path\": \"/api/banking/transfer/execute\",\n  \"method\": \"POST\",\n  \"biometrics\": {\n    \"typing_wpm\": 285.0,\n    \"typing_rhythm_cv\": 0.0012,\n    \"mouse_velocity_mean\": 0.0,\n    \"mouse_velocity_cv\": 0.0,\n    \"idle_time_ratio\": 0.0\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:7777/api/v1/analyze",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "7777",
+          "path": ["api", "v1", "analyze"]
+        },
+        "description": "Demonstrates Behavioral Biometrics (Signal 5 & Layer 6). 285 WPM typing with zero mouse motion is flagged as bot takeover."
+      }
+    }
+  ]
+}
